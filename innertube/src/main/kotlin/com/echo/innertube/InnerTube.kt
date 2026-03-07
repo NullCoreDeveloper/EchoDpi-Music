@@ -382,15 +382,21 @@ class InnerTube {
         client: YouTubeClient,
         playlistId: String,
         videoId: String,
+    ) = addVideosToPlaylist(client, playlistId, listOf(videoId))
+
+    suspend fun addVideosToPlaylist(
+        client: YouTubeClient,
+        playlistId: String,
+        videoIds: List<String>,
     ) = httpClient.post("browse/edit_playlist") {
         ytClient(client, setLogin = true)
         setBody(
             EditPlaylistBody(
                 context = client.toContext(locale, visitorData, dataSyncId),
                 playlistId = playlistId.removePrefix("VL"),
-                actions = listOf(
+                actions = videoIds.map { videoId ->
                     Action.AddVideoAction(addedVideoId = videoId)
-                )
+                }
             )
         )
     }
