@@ -1354,6 +1354,60 @@ fun LocalPlaylistHeader(
                                 modifier = Modifier.size(24.dp)
                             )
                         }
+                    } else {
+                        var isSyncingUp by remember { mutableStateOf(false) }
+
+                        IconButton(
+                            onClick = {
+                                if (isSyncingUp) return@IconButton
+                                isSyncingUp = true
+                                scope.launch(Dispatchers.IO) {
+                                    try {
+                                        // 1. Create a remote playlist
+                                        val newBrowseId = YouTube.createPlaylist(playlist.playlist.name)
+                                        if (newBrowseId != null) {
+                                            // 2. Add all local songs to it
+                                            for (song in songs) {
+                                                YouTube.addToPlaylist(newBrowseId, song.song.id)
+                                            }
+                                            // 3. Update the local playlist to link to the new remote one
+                                            database.query {
+                                                update(playlist.playlist.copy(browseId = newBrowseId))
+                                            }
+                                            withContext(Dispatchers.Main) {
+                                                snackbarHostState.showSnackbar(context.getString(R.string.playlist_synced))
+                                            }
+                                        } else {
+                                            withContext(Dispatchers.Main) {
+                                                snackbarHostState.showSnackbar("Failed to create playlist on YouTube")
+                                            }
+                                        }
+                                    } catch (e: Exception) {
+                                        e.printStackTrace()
+                                        withContext(Dispatchers.Main) {
+                                            snackbarHostState.showSnackbar("Error: ${e.message}")
+                                        }
+                                    } finally {
+                                        isSyncingUp = false
+                                    }
+                                }
+                            },
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            if (isSyncingUp) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            } else {
+                                Icon(
+                                    painter = painterResource(R.drawable.backup),
+                                    contentDescription = "Sync to Google Account",
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
                     }
 
                     when (downloadState) {
