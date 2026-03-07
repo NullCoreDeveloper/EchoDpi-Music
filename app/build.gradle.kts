@@ -7,8 +7,6 @@ plugins {
     alias(libs.plugins.hilt)
     alias(libs.plugins.kotlin.ksp)
     alias(libs.plugins.compose.compiler)
-    id("com.google.gms.google-services")
-    id("com.google.firebase.crashlytics")
 }
 
 val localProperties = Properties()
@@ -103,9 +101,6 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            firebaseCrashlytics {
-                mappingFileUploadEnabled = false
-            }
         }
         debug {
             applicationIdSuffix = ".debug"
@@ -257,11 +252,6 @@ dependencies {
     
     // QR Code generation
     implementation("com.google.zxing:core:3.5.3")
-    
-    // Firebase
-    implementation(platform(libs.firebase.bom))
-    implementation(libs.firebase.analytics)
-    implementation(libs.firebase.crashlytics)
     
     // Music Recognition
     implementation("com.github.f4b6a3:uuid-creator:6.1.1")

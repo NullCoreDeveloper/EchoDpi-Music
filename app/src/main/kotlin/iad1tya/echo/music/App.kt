@@ -19,9 +19,6 @@ import com.echo.innertube.YouTube
 import com.echo.innertube.models.YouTubeLocale
 import com.echo.kugou.KuGou
 import iad1tya.echo.music.utils.potoken.AppContextHolder
-import com.google.firebase.FirebaseApp
-import com.google.firebase.analytics.FirebaseAnalytics
-import com.google.firebase.crashlytics.FirebaseCrashlytics
 import iad1tya.echo.music.BuildConfig
 import iad1tya.echo.music.constants.*
 import com.metrolist.lastfm.LastFM
@@ -63,33 +60,6 @@ class App : Application(), SingletonImageLoader.Factory {
         AppContextHolder.initialize(this)
         Thread.setDefaultUncaughtExceptionHandler(CrashHandler(applicationContext))
         Timber.plant(Timber.DebugTree())
-
-        // Initialize Firebase with error handling
-        try {
-            val firebaseApp = FirebaseApp.initializeApp(this)
-            if (firebaseApp != null) {
-                // Enable Firebase Crashlytics collection
-                try {
-                    FirebaseCrashlytics.getInstance().setCrashlyticsCollectionEnabled(true)
-                } catch (e: Exception) {
-                    Timber.w(e, "Failed to enable Crashlytics")
-                }
-                
-                // Set user properties for Firebase Analytics
-                try {
-                    FirebaseAnalytics.getInstance(this).apply {
-                        setUserProperty("app_version", BuildConfig.VERSION_NAME)
-                        setUserProperty("architecture", BuildConfig.ARCHITECTURE)
-                    }
-                } catch (e: Exception) {
-                    Timber.w(e, "Failed to set Firebase Analytics properties")
-                }
-            } else {
-                Timber.w("Firebase initialization returned null - continuing without Firebase")
-            }
-        } catch (e: Exception) {
-            Timber.w(e, "Failed to initialize Firebase - app will continue without Firebase services")
-        }
 
         // تهيئة إعدادات التطبيق عند الإقلاع
         applicationScope.launch {

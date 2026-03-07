@@ -24,9 +24,6 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
-    - name: Prepare google-services.json
-      run: cp app/google-services.json.example app/google-services.json
-
     - name: Build and Sign Release APK
       run: |
         # Generate a temporary keystore for signing the release APK
