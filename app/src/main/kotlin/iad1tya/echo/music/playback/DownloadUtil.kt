@@ -56,7 +56,7 @@ constructor(
                 .setCache(playerCache)
                 .setUpstreamDataSourceFactory(
                     OkHttpDataSource.Factory(
-                        OkHttpClient.Builder()
+                        iad1tya.echo.music.dpi.core.DpiConfig.applyTo(OkHttpClient.Builder())
                             .proxy(YouTube.proxy)
                             .proxyAuthenticator { _, response ->
                                 YouTube.proxyAuth?.let { auth ->

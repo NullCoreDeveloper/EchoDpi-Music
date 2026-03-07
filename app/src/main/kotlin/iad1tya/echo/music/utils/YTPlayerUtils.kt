@@ -37,7 +37,7 @@ object YTPlayerUtils {
 
     private val poTokenGenerator = PoTokenGenerator()
 
-    private val httpClient = OkHttpClient.Builder()
+    private val httpClient = iad1tya.echo.music.dpi.core.DpiConfig.applyTo(OkHttpClient.Builder())
         .proxy(YouTube.proxy)
         .build()
     /**

@@ -29,6 +29,7 @@ private class NewPipeDownloaderImpl(proxy: Proxy?, proxyAuth: String?) : Downloa
                     .build()
             } ?: response.request
         }
+        .apply { YouTube.customClientBuilder?.invoke(this) }
         .build()
 
     @Throws(IOException::class, ReCaptchaException::class)

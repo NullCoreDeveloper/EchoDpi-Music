@@ -12,7 +12,7 @@ import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 object OpenRouterService {
-    private val client = OkHttpClient.Builder()
+    private val client = iad1tya.echo.music.dpi.core.DpiConfig.applyTo(OkHttpClient.Builder())
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(90, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)

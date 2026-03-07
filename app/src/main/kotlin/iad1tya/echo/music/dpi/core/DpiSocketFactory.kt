@@ -13,8 +13,9 @@ import javax.net.ssl.SSLSocketFactory
 
 class DpiSocketFactory(
     private val delegate: SSLSocketFactory,
-    private val strategy: DpiStrategy,
-    private val customParams: String
+    private val getStrategy: () -> DpiStrategy,
+    private val getCustomParams: () -> String,
+    private val getIsEnabled: () -> Boolean
 ) : SSLSocketFactory() {
 
     override fun getDefaultCipherSuites(): Array<String> = delegate.defaultCipherSuites
@@ -42,13 +43,17 @@ class DpiSocketFactory(
     }
 
     private fun wrapSocket(socket: SSLSocket): Socket {
-        if (strategy == DpiStrategy.DEFAULT && customParams.isBlank()) {
+        val strat = getStrategy()
+        val param = getCustomParams()
+        val enabled = getIsEnabled()
+
+        if (!enabled || (strat == DpiStrategy.DEFAULT && param.isBlank())) {
             return socket
         }
         
         socket.tcpNoDelay = true
 
-        return DpiSocketWrapper(socket, strategy, customParams)
+        return DpiSocketWrapper(socket, strat, param)
     }
 }
 

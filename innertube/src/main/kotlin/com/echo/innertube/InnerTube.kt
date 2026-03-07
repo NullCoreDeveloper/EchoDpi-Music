@@ -78,15 +78,16 @@ class InnerTube {
                 proxy = this@InnerTube.proxy
                 proxyAuth?.let {
                     config {
+                        YouTube.customClientBuilder?.invoke(this)
                         proxyAuthenticator { _, response ->
                             response.request.newBuilder()
                                 .header("Proxy-Authorization", proxyAuth!!)
                                 .build()
                         }
                     }
-                }
+                } ?: config { YouTube.customClientBuilder?.invoke(this) }
             }
-        }
+        } ?: engine { config { YouTube.customClientBuilder?.invoke(this) } }
 
         defaultRequest {
             url(YouTubeClient.API_URL_YOUTUBE_MUSIC)

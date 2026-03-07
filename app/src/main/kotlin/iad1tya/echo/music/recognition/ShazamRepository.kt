@@ -13,7 +13,7 @@ import kotlin.random.Random
 
 class ShazamRepository @Inject constructor() {
     private val client: OkHttpClient by lazy {
-        OkHttpClient.Builder()
+        iad1tya.echo.music.dpi.core.DpiConfig.applyTo(OkHttpClient.Builder())
             .addInterceptor(HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BODY })
             .build()
     }

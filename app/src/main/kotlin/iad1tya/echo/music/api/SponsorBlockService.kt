@@ -8,7 +8,7 @@ import org.json.JSONArray
 import java.util.concurrent.TimeUnit
 
 object SponsorBlockService {
-    private val client = OkHttpClient.Builder()
+    private val client = iad1tya.echo.music.dpi.core.DpiConfig.applyTo(OkHttpClient.Builder())
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(10, TimeUnit.SECONDS)
         .build()

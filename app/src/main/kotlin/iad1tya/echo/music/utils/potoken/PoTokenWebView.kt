@@ -270,7 +270,7 @@ class PoTokenWebView private constructor(
                 "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.3"
         private const val JS_INTERFACE = "PoTokenWebView"
 
-        private val httpClient = OkHttpClient.Builder()
+        private val httpClient = iad1tya.echo.music.dpi.core.DpiConfig.applyTo(OkHttpClient.Builder())
             .proxy(YouTube.proxy)
             .build()
 

@@ -45,7 +45,7 @@ fun CanvasArtworkPlayer(
     var isVideoReady by remember(initial) { mutableStateOf(false) }
 
     val okHttpClient = remember {
-        OkHttpClient.Builder()
+        iad1tya.echo.music.dpi.core.DpiConfig.applyTo(OkHttpClient.Builder())
             .proxy(YouTube.proxy)
             .build()
     }

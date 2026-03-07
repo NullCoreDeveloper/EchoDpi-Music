@@ -120,6 +120,8 @@ object YouTube {
             innerTube.useLoginForBrowse = value
         }
 
+    var customClientBuilder: ((okhttp3.OkHttpClient.Builder) -> Unit)? = null
+
     suspend fun searchSuggestions(query: String): Result<SearchSuggestions> = runCatching {
         val response = innerTube.getSearchSuggestions(WEB_REMIX, query).body<GetSearchSuggestionsResponse>()
         SearchSuggestions(

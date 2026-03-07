@@ -35,7 +35,7 @@ class DpiAutoProber {
             // val sslContext = SSLContext.getInstance("TLS")
             // sslContext.init(null, null, null)
             // val defaultSslSocketFactory = sslContext.socketFactory
-            // val customSslSocketFactory = DpiSocketFactory(defaultSslSocketFactory, strategy, "")
+            // val customSslSocketFactory = DpiSocketFactory(defaultSslSocketFactory, { strategy }, { "" }, { true })
             // val client = OkHttpClient.Builder()
             //     .sslSocketFactory(customSslSocketFactory, defaultTrustManager())
             //     .connectTimeout(3, TimeUnit.SECONDS)

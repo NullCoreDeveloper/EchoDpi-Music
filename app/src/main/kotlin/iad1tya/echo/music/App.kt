@@ -35,6 +35,9 @@ import iad1tya.echo.music.utils.reportException
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import iad1tya.echo.music.dpi.core.DpiConfig
+import iad1tya.echo.music.dpi.core.DpiStrategy
+import iad1tya.echo.music.dpi.core.applyDpi
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -99,6 +102,13 @@ class App : Application(), SingletonImageLoader.Factory {
         val settings = dataStore.data.first()
         val locale = Locale.getDefault()
         val languageTag = locale.toLanguageTag().replace("-Hant", "")
+        
+        DpiConfig.isEnabled = settings[DpiConfig.DpiEnabledKey] ?: true
+        val strategyStr = settings[DpiConfig.DpiStrategyKey] ?: DpiStrategy.DEFAULT.name
+        DpiConfig.currentStrategy = try { DpiStrategy.valueOf(strategyStr) } catch (e: Exception) { DpiStrategy.DEFAULT }
+        DpiConfig.customParams = settings[DpiConfig.DpiCustomParamsKey] ?: ""
+
+        YouTube.customClientBuilder = { it.applyDpi() }
 
         YouTube.locale = YouTubeLocale(
             gl = settings[ContentCountryKey]?.takeIf { it != SYSTEM_DEFAULT }
@@ -185,6 +195,15 @@ class App : Application(), SingletonImageLoader.Factory {
     }
 
     private fun observeSettingsChanges() {
+        applicationScope.launch(Dispatchers.IO) {
+            dataStore.data.collect { settings ->
+                DpiConfig.isEnabled = settings[DpiConfig.DpiEnabledKey] ?: true
+                val str = settings[DpiConfig.DpiStrategyKey] ?: DpiStrategy.DEFAULT.name
+                DpiConfig.currentStrategy = try { DpiStrategy.valueOf(str) } catch (e: Exception) { DpiStrategy.DEFAULT }
+                DpiConfig.customParams = settings[DpiConfig.DpiCustomParamsKey] ?: ""
+            }
+        }
+
         applicationScope.launch(Dispatchers.IO) {
             dataStore.data
                 .map { it[VisitorDataKey] }
