@@ -23,7 +23,7 @@ object LocalDpiProxyServer {
     fun start() {
         if (serverSocket != null && !serverSocket!!.isClosed) return
         try {
-            serverSocket = ServerSocket(0, 50, Inet4Address.getByName("127.0.0.1"))
+            serverSocket = ServerSocket(39321, 50, Inet4Address.getByName("127.0.0.1"))
             port = serverSocket!!.localPort
             Timber.d("LocalDpiProxyServer started on port $port")
 
