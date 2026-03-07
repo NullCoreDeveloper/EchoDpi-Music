@@ -1,6 +1,10 @@
 package iad1tya.echo.music.ui.screens
 
 import androidx.compose.animation.core.tween
+import androidx.datastore.preferences.core.edit
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import iad1tya.echo.music.utils.dataStore
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -358,24 +362,24 @@ fun NavGraphBuilder.navigationBuilder(
         iad1tya.echo.music.dpi.ui.DpiSettingsScreen(
             currentEnabled = currentEnabled,
             onEnabledChange = { enabled ->
-                coroutineScope.kotlinx.coroutines.launch(kotlinx.coroutines.Dispatchers.IO) {
-                    iad1tya.echo.music.utils.dataStore(context).edit {
+                coroutineScope.launch(Dispatchers.IO) {
+                    context.dataStore.edit {
                         it[iad1tya.echo.music.dpi.core.DpiConfig.DpiEnabledKey] = enabled
                     }
                 }
             },
             currentStrategy = currentStrategy,
             onStrategyChange = { strategy ->
-                coroutineScope.kotlinx.coroutines.launch(kotlinx.coroutines.Dispatchers.IO) {
-                    iad1tya.echo.music.utils.dataStore(context).edit {
+                coroutineScope.launch(Dispatchers.IO) {
+                    context.dataStore.edit {
                         it[iad1tya.echo.music.dpi.core.DpiConfig.DpiStrategyKey] = strategy.name
                     }
                 }
             },
             currentParams = currentParams,
             onParamsChange = { params ->
-                coroutineScope.kotlinx.coroutines.launch(kotlinx.coroutines.Dispatchers.IO) {
-                    iad1tya.echo.music.utils.dataStore(context).edit {
+                coroutineScope.launch(Dispatchers.IO) {
+                    context.dataStore.edit {
                         it[iad1tya.echo.music.dpi.core.DpiConfig.DpiCustomParamsKey] = params
                     }
                 }
