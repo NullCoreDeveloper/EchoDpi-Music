@@ -11,13 +11,7 @@ class DpiAutoProber {
     suspend fun findOptimalStrategy(
         onProgress: suspend (Int, Int, DpiStrategy) -> Unit
     ): DpiStrategy? = withContext(Dispatchers.IO) {
-        val strategiesToTest = listOf(
-            DpiStrategy.DEFAULT,
-            DpiStrategy.SPLIT_1,
-            DpiStrategy.SPLIT_2,
-            DpiStrategy.OOB_INJECT,
-            DpiStrategy.SNI_FRAG
-        )
+        val strategiesToTest = DpiStrategy.entries.toList()
 
         for ((index, strategy) in strategiesToTest.withIndex()) {
             onProgress(index + 1, strategiesToTest.size, strategy)
@@ -42,8 +36,8 @@ class DpiAutoProber {
             
             val client = OkHttpClient.Builder()
                 .socketFactory(customSocketFactory)
-                .connectTimeout(4, TimeUnit.SECONDS)
-                .readTimeout(4, TimeUnit.SECONDS)
+                .connectTimeout(1200, TimeUnit.MILLISECONDS)
+                .readTimeout(1200, TimeUnit.MILLISECONDS)
                 .build()
 
             val request = Request.Builder()

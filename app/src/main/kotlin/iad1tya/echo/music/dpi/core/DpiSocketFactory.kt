@@ -121,95 +121,36 @@ class DpiOutputStream(
             isFirstPacket = false
             // ... (rest of the logic stays the same but isFirstPacket is now false at the end) ...
             try {
-                when (strategy) {
-                    DpiStrategy.SPLIT_1 -> {
-                        delegate.write(b, off, 1)
-                        delegate.flush()
-                        Thread.sleep(2) // Reduced sleep
-                        delegate.write(b, off + 1, len - 1)
-                        delegate.flush()
-                    }
-                    DpiStrategy.SPLIT_2 -> {
-                        delegate.write(b, off, 1)
-                        delegate.flush()
-                        Thread.sleep(2)
-                        if (len > 4) {
-                            delegate.write(b, off + 1, 3)
-                            delegate.flush()
-                            Thread.sleep(2)
-                            delegate.write(b, off + 4, len - 4)
-                            delegate.flush()
-                        } else {
-                            delegate.write(b, off + 1, len - 1)
-                            delegate.flush()
-                        }
-                    }
-                    DpiStrategy.OOB_INJECT -> {
-                        delegate.write(b, off, 1)
-                        delegate.flush()
-                        try {
-                            socket.sendUrgentData(0x00)
-                        } catch (ignore: Exception) {} 
-                        Thread.sleep(2)
-                        delegate.write(b, off + 1, len - 1)
-                        delegate.flush()
-                    }
-                    DpiStrategy.SNI_FRAG -> {
-                        var offset = off
-                        val end = off + len
-                        // First small chunk
-                        delegate.write(b, offset, 1)
-                        delegate.flush()
-                        Thread.sleep(2)
-                        offset += 1
-                        
-                        // Remaining data in bigger chunks to avoid excessive overhead
-                        while (offset < end) {
-                            val chunkLen = if (end - offset > 100) 100 else end - offset
-                            delegate.write(b, offset, chunkLen)
-                            delegate.flush()
-                            offset += chunkLen
-                        }
-                    }
-                    DpiStrategy.PRO_MIX_1 -> {
-                        // Mix of Split and OOB for stability
-                        delegate.write(b, off, 1)
-                        delegate.flush()
-                        try { socket.sendUrgentData(0x00) } catch (e: Exception) {}
-                        Thread.sleep(2)
-                        delegate.write(b, off + 1, 3)
-                        delegate.flush()
-                        Thread.sleep(2)
-                        delegate.write(b, off + 4, len - 4)
-                        delegate.flush()
-                    }
-                    DpiStrategy.PRO_MIX_2 -> {
-                        // Aggressive fragmentation
-                        var offset = off
-                        val end = off + len
-                        val smallChunks = 4
-                        for (i in 0 until smallChunks) {
-                            if (offset < end) {
-                                delegate.write(b, offset, 1)
-                                delegate.flush()
-                                Thread.sleep(1)
-                                offset++
-                            }
-                        }
-                        if (offset < end) {
-                            delegate.write(b, offset, end - offset)
-                            delegate.flush()
-                        }
-                    }
-                    else -> {
-                        delegate.write(b, off, len)
-                    }
+                // Проверяем все стратегии PRO как единую логику агрессивной фрагментации
+                // так как они отличаются параметрами для CLI, но здесь мы делаем универсальный обход.
+                
+                // Агрессивная нарезка начала пакета (напр. первые 5 байт по 1 байту)
+                val initialBytesToFragment = 5
+                var bytesFragmented = 0
+                
+                while (bytesFragmented < initialBytesToFragment && bytesFragmented < len) {
+                    delegate.write(b, off + bytesFragmented, 1)
+                    delegate.flush()
+                    // Очень маленькая задержка для ТСПУ
+                    Thread.sleep(1)
+                    bytesFragmented++
                 }
+                
+                // Оставшаяся часть пакета
+                if (bytesFragmented < len) {
+                    delegate.write(b, off + bytesFragmented, len - bytesFragmented)
+                    delegate.flush()
+                }
+                
+                // КРИТИЧНО: Сразу сбрасываем флаг, чтобы следующие пакеты шли без задержек вообще
+                isHandshakeDone = true
             } catch (e: Exception) {
+                // Если что-то пошло не так, пишем как есть
                 delegate.write(b, off, len)
+                isHandshakeDone = true
             }
         } else {
-            // Если это не TLS Handshake или мы его уже прошли (что проверяется в начале функции)
+            // Весь последующий трафик (после Handshake) идет напрямую на максимальной скорости
             delegate.write(b, off, len)
         }
     }

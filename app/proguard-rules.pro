@@ -203,6 +203,7 @@
 ## OkHttp/Retrofit Rules
 -keep class okhttp3.** { *; }
 -keep interface okhttp3.** { *; }
+-keep class okhttp3.internal.** { *; }
 -dontwarn okhttp3.**
 -dontwarn okio.**
 

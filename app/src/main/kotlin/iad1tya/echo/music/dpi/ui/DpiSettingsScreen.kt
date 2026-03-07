@@ -102,17 +102,22 @@ fun DpiSettingsScreen(
                             coroutineScope.launch {
                                 val prober = DpiAutoProber()
                                 val optimal = prober.findOptimalStrategy { step, total, strategy ->
-                                    probeProgress = step.toFloat() / total
-                                    probeText = "Тестируем: ${strategy.title}"
+                                    if (isProbing) { // Only update if not canceled
+                                        probeProgress = step.toFloat() / total
+                                        probeText = "Тестируем: ${strategy.title}"
+                                    }
                                 }
-                                isProbing = false
-                                if (optimal != null) {
-                                    probeSuccess = true
-                                    probeText = "Оптимальный конфиг найден (Пинги: ~45ms)"
-                                    onEnabledChange(true)
-                                    onStrategyChange(optimal)
-                                } else {
-                                    probeText = "Не удалось найти рабочий конфиг"
+                                if (isProbing) {
+                                    isProbing = false
+                                    if (optimal != null) {
+                                        probeSuccess = true
+                                        probeText = "Оптимальный конфиг найден"
+                                        onEnabledChange(true)
+                                        // Force UI update
+                                        onStrategyChange(optimal)
+                                    } else {
+                                        probeText = "Не удалось найти рабочий конфиг"
+                                    }
                                 }
                             }
                         },
@@ -120,6 +125,17 @@ fun DpiSettingsScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(if (isProbing) "Поиск маршрута..." else "Найти оптимальную стратегию")
+                    }
+
+                    if (isProbing) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = { isProbing = false },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                        ) {
+                            Text("Остановить")
+                        }
                     }
 
                     AnimatedVisibility(visible = isProbing || probeText.isNotEmpty()) {
@@ -157,7 +173,7 @@ fun DpiSettingsScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     Text("Выбор пресета", style = MaterialTheme.typography.titleSmall)
-                    DpiStrategy.values().forEach { strategy ->
+                    DpiStrategy.entries.forEach { strategy ->
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth()
