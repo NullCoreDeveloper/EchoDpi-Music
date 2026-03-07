@@ -24,6 +24,7 @@ import okhttp3.OkHttpClient
 import timber.log.Timber
 import iad1tya.echo.music.utils.potoken.PoTokenGenerator
 import iad1tya.echo.music.utils.potoken.PoTokenResult
+import kotlinx.coroutines.*
 
 object YTPlayerUtils {
     private const val logTag = "YTPlayerUtils"
@@ -138,7 +139,7 @@ object YTPlayerUtils {
             var mainPlayerResponse =
                 YouTube.player(videoId, apiPlaylistId, MAIN_CLIENT, signatureTimestamp, null).getOrThrow()
 
-            val poToken = poTokenDeferred.await()
+            val poToken: PoTokenResult? = poTokenDeferred.await()
 
             // Check for age-restricted content
             val mainStatus = mainPlayerResponse.playabilityStatus.status
@@ -353,16 +354,16 @@ object YTPlayerUtils {
             cachedPublicVideoId = videoId
             Timber.tag(logTag).d("Cached public videoId: $videoId for future private track resolution")
         }
-        PlaybackData(
-            audioConfig,
-            videoDetails,
-            playbackTracking,
-            format,
-            streamUrl,
-            streamExpiresInSeconds,
-        )
+            PlaybackData(
+                audioConfig,
+                videoDetails,
+                playbackTracking,
+                format,
+                streamUrl,
+                streamExpiresInSeconds,
+            )
+        }
     }
-}
     /**
      * Simple player response intended to use for metadata only.
      * Stream URLs of this response might not work so don't use them.
