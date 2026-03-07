@@ -35,7 +35,8 @@ jobs:
         export STORE_PASSWORD=android
         export KEY_ALIAS=androiddebugkey
         export KEY_PASSWORD=android
-        ./gradlew assembleUniversalRelease -PfirebaseCrashlytics.mappingFileUploadEnabled=false
+        echo "firebaseCrashlytics.mappingFileUploadEnabled=false" >> gradle.properties
+        ./gradlew assembleUniversalRelease
 
     - name: Rename APK
       run: |
