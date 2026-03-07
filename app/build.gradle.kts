@@ -22,7 +22,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "iad1tya.echo.music"
+        applicationId = "iad1tya.echo.music.dpi"
         minSdk = 26
         targetSdk = 36
         versionCode = 402
