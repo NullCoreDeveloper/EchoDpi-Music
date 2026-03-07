@@ -288,6 +288,8 @@ object YTPlayerUtils {
                 // would be false — causing validateStatus() to run, which fails because private
                 // CDN stream URLs don't respond to unauthenticated HEAD requests, and the loop
                 // then continues past the valid TVHTML5 stream to eventual WEB_CREATOR failure.
+                val isPrivatelyOwned = streamPlayerResponse?.videoDetails?.musicVideoType ==
+                    "MUSIC_VIDEO_TYPE_PRIVATELY_OWNED_TRACK" || isUploadedTrack || isPrivateTrack
                 if (clientIndex == -1 || clientIndex == STREAM_FALLBACK_CLIENTS.size - 1 || isPrivatelyOwned) {
                     if (isPrivatelyOwned) {
                         Timber.tag(logTag).d("Skipping validation for privately owned/uploaded track")
