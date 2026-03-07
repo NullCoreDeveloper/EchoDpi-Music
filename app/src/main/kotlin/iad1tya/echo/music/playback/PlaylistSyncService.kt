@@ -108,19 +108,35 @@ class PlaylistSyncService : Service() {
                 }
 
                 // 2. Add songs in batches
-                val batchSize = 50
+                val batchSize = 25 // Smaller batch for better reliability
                 var syncedCount = 0
                 for (i in 0 until songIds.size step batchSize) {
                     val batch = songIds.subList(i, minOf(i + batchSize, songIds.size))
-                    val result = YouTube.addVideosToPlaylist(newBrowseId, batch)
                     
-                    if (result.isSuccess) {
-                        syncedCount += batch.size
-                        updateNotification(playlistName, "Syncing: $syncedCount/${songIds.size}", syncedCount, songIds.size)
-                    } else {
-                        val error = result.exceptionOrNull()?.message ?: "Unknown error"
-                        updateNotification(playlistName, "Batch error: $error. Continuing...", syncedCount, songIds.size)
-                        Timber.e(result.exceptionOrNull(), "Failed to sync batch")
+                    var retryCount = 0
+                    val maxRetries = 3
+                    var success = false
+                    
+                    while (retryCount < maxRetries && !success) {
+                        val result = YouTube.addVideosToPlaylist(newBrowseId, batch)
+                        if (result.isSuccess) {
+                            syncedCount += batch.size
+                            updateNotification(playlistName, "Syncing: $syncedCount/${songIds.size}", syncedCount, songIds.size)
+                            success = true
+                        } else {
+                            retryCount++
+                            val error = result.exceptionOrNull()?.message ?: "Unknown error"
+                            Timber.e(result.exceptionOrNull(), "Failed to sync batch (attempt $retryCount)")
+                            if (retryCount < maxRetries) {
+                                delay(2000L * retryCount) // Exponential-ish backoff
+                            } else {
+                                updateNotification(playlistName, "Batch error: $error. Continuing...", syncedCount, songIds.size)
+                            }
+                        }
+                    }
+                    
+                    if (i + batchSize < songIds.size) {
+                        delay(1000) // Small delay between successful batches to avoid rate limiting
                     }
                 }
 
