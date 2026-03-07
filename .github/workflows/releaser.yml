@@ -1,4 +1,4 @@
-name: Android CI
+name: Android Release CI
 
 on:
   push:
@@ -7,9 +7,7 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
     permissions:
       contents: write
 
@@ -26,26 +24,24 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
-    - name: Build with Gradle
-      run: ./gradlew assembleRelease
+    - name: Build and Sign Release APK
+      run: |
+        # Generate a temporary keystore for signing the release APK
+        keytool -genkey -v -keystore release.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "C=US, O=Android, CN=Android Debug"
+        export KEYSTORE_PATH=$(pwd)/release.keystore
+        export STORE_PASSWORD=android
+        export KEY_ALIAS=androiddebugkey
+        export KEY_PASSWORD=android
+        ./gradlew assembleUniversalRelease
 
-    - name: Sign APK
-      uses: r0adkll/sign-android-release@v1
-      # Only run if signing key is provided
-      if: ${{ secrets.SIGNING_KEY }}
-      id: sign_app
-      with:
-        releaseDirectory: app/build/outputs/apk/release
-        signingKeyBase64: ${{ secrets.SIGNING_KEY }}
-        alias: ${{ secrets.KEY_ALIAS }}
-        keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
-        keyPassword: ${{ secrets.KEY_PASSWORD }}
+    - name: Rename APK
+      run: |
+        mv app/build/outputs/apk/universal/release/app-universal-release.apk app/build/outputs/apk/universal/release/Echo-Dpi-Music-${{ github.ref_name }}.apk
 
     - name: Release APK
       uses: softprops/action-gh-release@v2
       with:
-        files: |
-          app/build/outputs/apk/release/*.apk
+        files: app/build/outputs/apk/universal/release/*.apk
         generate_release_notes: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
