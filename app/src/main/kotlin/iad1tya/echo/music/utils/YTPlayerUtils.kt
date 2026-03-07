@@ -37,9 +37,12 @@ object YTPlayerUtils {
 
     private val poTokenGenerator = PoTokenGenerator()
 
-    private val httpClient = iad1tya.echo.music.dpi.core.DpiConfig.applyTo(OkHttpClient.Builder())
-        .proxy(YouTube.proxy)
-        .build()
+    private val httpClient = iad1tya.echo.music.dpi.core.DpiConfig.applyTo(
+        OkHttpClient.Builder()
+            .apply {
+                YouTube.proxy?.let { proxy(it) }
+            }
+    ).build()
     /**
      * The main client is used for metadata and initial streams.
      * [WEB_REMIX] provides correct metadata (loudnessDb), premium formats,
@@ -85,63 +88,64 @@ object YTPlayerUtils {
         audioQuality: AudioQuality,
         connectivityManager: ConnectivityManager,
     ): Result<PlaybackData> = runCatching {
-        Timber.tag(logTag).d("Fetching player response for videoId: $videoId, playlistId: $playlistId")
+        coroutineScope {
+            Timber.tag(logTag).d("Fetching player response for videoId: $videoId, playlistId: $playlistId")
 
-        // Detect uploaded/privately owned tracks (MLPT = My Library Personal Tracks sentinel).
-        // "MLPT" is Echo-internal — never forward it to the YouTube API.
-        val isUploadedTrack = playlistId == "MLPT" || playlistId?.startsWith("MLPT") == true
-        // Real YouTube playlist ID to pass to the API — null for uploaded tracks so YouTube
-        // doesn't reject the request with "this video is not available".
-        val apiPlaylistId: String? = if (isUploadedTrack) null else playlistId
-        if (isUploadedTrack) {
-            Timber.tag(logTag).d("Detected uploaded track (MLPT sentinel) — apiPlaylistId=null")
-        }
-
-        // Get signature timestamp; for private/uploaded videos NewPipe can't access the
-        // private video page, so fall back to the cached public video's JS player.
-        val signatureTimestamp = getSignatureTimestampOrNull(videoId)
-            ?: cachedPublicVideoId?.let { fallbackId ->
-                Timber.tag(logTag).d("Sig timestamp failed for $videoId, retrying with cached public video: $fallbackId")
-                getSignatureTimestampOrNull(fallbackId)
+            // Detect uploaded/privately owned tracks (MLPT = My Library Personal Tracks sentinel).
+            // "MLPT" is Echo-internal — never forward it to the YouTube API.
+            val isUploadedTrack = playlistId == "MLPT" || playlistId?.startsWith("MLPT") == true
+            // Real YouTube playlist ID to pass to the API — null for uploaded tracks so YouTube
+            // doesn't reject the request with "this video is not available".
+            val apiPlaylistId: String? = if (isUploadedTrack) null else playlistId
+            if (isUploadedTrack) {
+                Timber.tag(logTag).d("Detected uploaded track (MLPT sentinel) — apiPlaylistId=null")
             }
-        Timber.tag(logTag).d("Signature timestamp: $signatureTimestamp")
 
-        val isLoggedIn = YouTube.cookie != null
-        Timber.tag(logTag).d("Session authentication status: ${if (isLoggedIn) "Logged in" else "Not logged in"}")
+            val isLoggedIn = YouTube.cookie != null
+            val sessionId = if (isLoggedIn) {
+                YouTube.dataSyncId?.takeIf { it.isNotEmpty() } ?: YouTube.visitorData
+            } else {
+                YouTube.visitorData
+            }
 
-        // Generate PoToken for clients that require it (WEB_REMIX, TVHTML5)
-        var poToken: PoTokenResult? = null
-        // Use dataSyncId when logged in, fall back to visitorData if dataSyncId is empty/null
-        val sessionId = if (isLoggedIn) {
-            YouTube.dataSyncId?.takeIf { it.isNotEmpty() } ?: YouTube.visitorData
-        } else {
-            YouTube.visitorData
-        }
-        if (MAIN_CLIENT.useWebPoTokens && sessionId != null) {
-            Timber.tag(logTag).d("Generating PoToken for ${MAIN_CLIENT.clientName}")
-            try {
-                poToken = poTokenGenerator.getWebClientPoToken(videoId, sessionId)
-                if (poToken != null) {
-                    Timber.tag(logTag).d("PoToken generated successfully")
+            val sigTimestampDeferred = async(Dispatchers.IO) {
+                getSignatureTimestampOrNull(videoId)
+            }
+            val poTokenDeferred = async(Dispatchers.IO) {
+                if (MAIN_CLIENT.useWebPoTokens && sessionId != null) {
+                    Timber.tag(logTag).d("Generating PoToken for ${MAIN_CLIENT.clientName}")
+                    try {
+                        val pt = poTokenGenerator.getWebClientPoToken(videoId, sessionId)
+                        if (pt != null) {
+                            Timber.tag(logTag).d("PoToken generated successfully")
+                        }
+                        pt
+                    } catch (e: Exception) {
+                        Timber.tag(logTag).e(e, "PoToken generation failed: ${e.message}")
+                        null
+                    }
+                } else null
+            }
+
+            val signatureTimestamp = sigTimestampDeferred.await()
+                ?: cachedPublicVideoId?.let { fallbackId ->
+                    Timber.tag(logTag).d("Sig timestamp failed for $videoId, retrying with cached public video: $fallbackId")
+                    getSignatureTimestampOrNull(fallbackId)
                 }
-            } catch (e: Exception) {
-                Timber.tag(logTag).e(e, "PoToken generation failed: ${e.message}")
-            }
-        }
+            Timber.tag(logTag).d("Signature timestamp: $signatureTimestamp")
 
-        Timber.tag(logTag).d("Attempting to get player response using MAIN_CLIENT: ${MAIN_CLIENT.clientName}")
-        // Do NOT pass PoToken to WEB_REMIX for the main metadata request.
-        // WEB_REMIX works fine without PoToken for private/uploaded tracks.
-        // Passing an invalid PoToken causes WEB_REMIX to return UNPLAYABLE.
-        var mainPlayerResponse =
-            YouTube.player(videoId, apiPlaylistId, MAIN_CLIENT, signatureTimestamp, null).getOrThrow()
+            Timber.tag(logTag).d("Attempting to get player response using MAIN_CLIENT: ${MAIN_CLIENT.clientName}")
+            var mainPlayerResponse =
+                YouTube.player(videoId, apiPlaylistId, MAIN_CLIENT, signatureTimestamp, null).getOrThrow()
 
-        // Check for age-restricted content
-        val mainStatus = mainPlayerResponse.playabilityStatus.status
-        val isAgeRestricted = mainStatus in listOf(
-            "AGE_CHECK_REQUIRED", "AGE_VERIFICATION_REQUIRED",
-            "LOGIN_REQUIRED", "CONTENT_CHECK_REQUIRED"
-        )
+            val poToken = poTokenDeferred.await()
+
+            // Check for age-restricted content
+            val mainStatus = mainPlayerResponse.playabilityStatus.status
+            val isAgeRestricted = mainStatus in listOf(
+                "AGE_CHECK_REQUIRED", "AGE_VERIFICATION_REQUIRED",
+                "LOGIN_REQUIRED", "CONTENT_CHECK_REQUIRED"
+            )
 
         if (isAgeRestricted && isLoggedIn) {
             Timber.tag(logTag).d("Age-restricted detected, trying WEB_CREATOR")
@@ -358,6 +362,7 @@ object YTPlayerUtils {
             streamExpiresInSeconds,
         )
     }
+}
     /**
      * Simple player response intended to use for metadata only.
      * Stream URLs of this response might not work so don't use them.

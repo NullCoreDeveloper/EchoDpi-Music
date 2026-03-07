@@ -34,7 +34,10 @@ import kotlinx.coroutines.delay
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.okhttp.OkHttpDataSource
+import okhttp3.OkHttpClient
+import iad1tya.echo.music.dpi.core.DpiConfig
+import java.util.concurrent.TimeUnit
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.source.MergingMediaSource
@@ -184,10 +187,13 @@ class VideoPlayerActivity : ComponentActivity() {
         
         // Function to load/switch video quality
         fun loadVideo(videoUrl: String, audioUrl: String? = null, seekToPosition: Long? = null) {
-            val dataSourceFactory = DefaultHttpDataSource.Factory()
-                .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                .setConnectTimeoutMs(10000)
-                .setReadTimeoutMs(10000)
+            val dataSourceFactory = OkHttpDataSource.Factory(
+                DpiConfig.applyTo(
+                    OkHttpClient.Builder()
+                        .connectTimeout(10, TimeUnit.SECONDS)
+                        .readTimeout(10, TimeUnit.SECONDS)
+                ).build()
+            ).setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
             
             val mediaSource = if (audioUrl != null) {
                 // High quality: merge separate video and audio streams
