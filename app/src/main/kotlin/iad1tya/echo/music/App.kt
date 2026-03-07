@@ -15,6 +15,7 @@ import coil3.disk.directory
 import coil3.request.CachePolicy
 import coil3.request.allowHardware
 import coil3.request.crossfade
+import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import com.echo.innertube.YouTube
 import com.echo.innertube.models.YouTubeLocale
 import com.echo.kugou.KuGou
@@ -231,6 +232,11 @@ class App : Application(), SingletonImageLoader.Factory {
         val cacheSize = dataStore.get(MaxImageCacheSizeKey, 512)
 
         return ImageLoader.Builder(this).apply {
+            components {
+                add(OkHttpNetworkFetcherFactory {
+                    okhttp3.OkHttpClient.Builder().applyDpi().build()
+                })
+            }
             crossfade(false)
             allowHardware(Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
             if (cacheSize == 0) {

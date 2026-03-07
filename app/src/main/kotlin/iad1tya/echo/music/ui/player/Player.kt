@@ -748,7 +748,7 @@ fun BottomSheetPlayer(
                     LaunchedEffect(mediaMetadata.thumbnailUrl) {
                         mediaMetadata.thumbnailUrl?.let { thumbnailUrl ->
                             try {
-                                val imageLoader = coil3.ImageLoader.Builder(context).build()
+                                val imageLoader = context.imageLoader
                                 val request = ImageRequest.Builder(context)
                                     .data(thumbnailUrl)
                                     .build()

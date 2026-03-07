@@ -397,7 +397,7 @@ private fun SuccessView(
                 .allowHardware(false) // Required for palette
                 .build()
             
-            val result = coil3.ImageLoader(context).execute(request)
+            val result = context.imageLoader.execute(request)
             result.image?.toBitmap()?.let { bitmap ->
                  // Use PlayerColorExtractor to get rich colors
                  val palette = androidx.palette.graphics.Palette.from(bitmap).generate()

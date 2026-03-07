@@ -17,6 +17,7 @@ import androidx.core.graphics.drawable.toBitmap
 import androidx.core.graphics.withClip
 import androidx.core.graphics.withTranslation
 import coil3.ImageLoader
+import coil3.imageLoader
 import coil3.request.ImageRequest
 import coil3.request.allowHardware
 import coil3.toBitmap
@@ -78,7 +79,7 @@ object ComposeToImage {
         var coverArtBitmap: Bitmap? = null
         if (coverArtUrl != null) {
             try {
-                val imageLoader = ImageLoader(context)
+                val imageLoader = context.imageLoader
                 val request = ImageRequest.Builder(context)
                     .data(coverArtUrl)
                     .size(256)
