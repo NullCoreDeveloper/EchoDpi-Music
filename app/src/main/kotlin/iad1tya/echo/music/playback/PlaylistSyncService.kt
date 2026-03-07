@@ -1,14 +1,17 @@
 package iad1tya.echo.music.playback
 
+import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import androidx.core.content.ContextCompat
 import androidx.core.app.NotificationCompat
 import com.echo.innertube.YouTube
 import iad1tya.echo.music.R
@@ -62,6 +65,7 @@ class PlaylistSyncService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Timber.d("PlaylistSyncService onStartCommand")
         val playlistId = intent?.getStringExtra(EXTRA_PLAYLIST_ID)
         val playlistName = intent?.getStringExtra(EXTRA_PLAYLIST_NAME) ?: "Playlist"
         val songIds = intent?.getStringArrayListExtra(EXTRA_SONG_IDS) ?: arrayListOf()
@@ -69,6 +73,13 @@ class PlaylistSyncService : Service() {
         if (playlistId == null || songIds.isEmpty()) {
             stopSelf()
             return START_NOT_STICKY
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val permission = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+            if (permission != PackageManager.PERMISSION_GRANTED) {
+                Timber.w("Notification permission not granted for PlaylistSyncService")
+            }
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -139,8 +150,8 @@ class PlaylistSyncService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Playlist Sync",
-                NotificationManager.IMPORTANCE_DEFAULT
+                "Synchronizing Playlists",
+                NotificationManager.IMPORTANCE_HIGH
             )
             notificationManager?.createNotificationChannel(channel)
         }
@@ -159,7 +170,7 @@ class PlaylistSyncService : Service() {
         )
 
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.backup)
+            .setSmallIcon(R.drawable.notification)
             .setContentTitle(title)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setOngoing(!isFinished)
@@ -186,7 +197,7 @@ class PlaylistSyncService : Service() {
         )
 
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.backup)
+            .setSmallIcon(R.drawable.notification)
             .setContentTitle(title)
             .setContentText(content)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
