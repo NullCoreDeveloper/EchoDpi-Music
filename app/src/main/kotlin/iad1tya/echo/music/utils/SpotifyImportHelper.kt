@@ -129,18 +129,31 @@ object SpotifyImportHelper {
         playlistName to songs.toList()
     }
 
-    /**
-     * Search YouTube for a song by title and artist, returning the best match video ID.
-     */
     suspend fun searchYouTubeForSong(title: String, artist: String): String? = withContext(Dispatchers.IO) {
         try {
             val query = "$title $artist"
-            val result = com.echo.innertube.YouTube.search(query, com.echo.innertube.YouTube.SearchFilter.FILTER_SONG)
-            val items = result.getOrNull()?.items ?: return@withContext null
-            val songItem = items.filterIsInstance<com.echo.innertube.models.SongItem>().firstOrNull()
+            val songResult = com.echo.innertube.YouTube.search(query, com.echo.innertube.YouTube.SearchFilter.FILTER_SONG)
+            val songItems = songResult.getOrNull()?.items
+            val songItem = songItems?.filterIsInstance<com.echo.innertube.models.SongItem>()?.firstOrNull()
+            
             songItem?.id
         } catch (e: Exception) {
             Log.e(TAG, "YouTube search failed for '$title - $artist': ${e.message}")
+            null
+        }
+    }
+
+    suspend fun searchYouTubeForVideo(title: String, artist: String): String? = withContext(Dispatchers.IO) {
+        try {
+            val query = "$title $artist"
+            // Second iteration: search as video and get the first item regardless of type
+            val videoResult = com.echo.innertube.YouTube.search(query, com.echo.innertube.YouTube.SearchFilter.FILTER_VIDEO)
+            val videoItems = videoResult.getOrNull()?.items
+            val firstItem = videoItems?.firstOrNull()
+            
+            firstItem?.id
+        } catch (e: Exception) {
+            Log.e(TAG, "YouTube video search failed for '$title - $artist': ${e.message}")
             null
         }
     }

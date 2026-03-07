@@ -204,8 +204,10 @@
 -keep class okhttp3.** { *; }
 -keep interface okhttp3.** { *; }
 -keep class okhttp3.internal.** { *; }
+-keepclassmembers class okhttp3.internal.** { *; }
 -keep class okhttp3.internal.Util { *; }
 -keep class okhttp3.JavaNetCookieJar { *; }
+-keepclassmembers class okhttp3.JavaNetCookieJar { *; }
 -dontwarn okhttp3.**
 -dontwarn okio.**
 -keep class okio.** { *; }

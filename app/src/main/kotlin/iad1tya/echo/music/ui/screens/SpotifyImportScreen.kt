@@ -157,8 +157,25 @@ fun SpotifyImportScreen(
                                 if (videoId != null) {
                                     foundIds.add(videoId)
                                 } else {
-                                    failed.add("$title - $artist")
+                                    failed.add(pair)
                                 }
+                            }
+
+                            // Second pass for failed songs using FILTER_VIDEO
+                            if (failed.isNotEmpty()) {
+                                statusText = "Searching ${failed.size} failed songs as video..."
+                                val stillFailed = mutableListOf<Pair<String, String>>()
+                                for (pair in failed) {
+                                    val (title, artist) = pair
+                                    val videoId = SpotifyImportHelper.searchYouTubeForVideo(title, artist)
+                                    if (videoId != null) {
+                                        foundIds.add(videoId)
+                                    } else {
+                                        stillFailed.add(pair)
+                                    }
+                                }
+                                failed.clear()
+                                failed.addAll(stillFailed)
                             }
 
                             // Create playlist with found songs

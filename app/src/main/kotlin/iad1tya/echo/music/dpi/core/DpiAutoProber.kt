@@ -36,13 +36,13 @@ class DpiAutoProber {
             
             val client = OkHttpClient.Builder()
                 .socketFactory(customSocketFactory)
-                .connectTimeout(2000, TimeUnit.MILLISECONDS)
-                .readTimeout(2000, TimeUnit.MILLISECONDS)
+                .connectTimeout(8000, TimeUnit.MILLISECONDS)
+                .readTimeout(8000, TimeUnit.MILLISECONDS)
                 .build()
 
             val request = Request.Builder()
-                // youtubei.googleapis.com is an essential YT Music endpoint blocked by DPI in RF
-                .url("https://youtubei.googleapis.com/generate_204")
+                // Используем обычный www.youtube.com, он стабильнее для HEAD запросов, чем youtubei
+                .url("https://www.youtube.com/")
                 .head() // Use HEAD to minimize bandwidth during tests
                 .build()
 
@@ -55,6 +55,7 @@ class DpiAutoProber {
             return@withContext true
         } catch (e: Exception) {
             // Connection reset by peer, Timeout, SSLHandshakeException -> DPI сбросил/замедлил соединение
+            android.util.Log.e("DpiAutoProber", "Strategy ${strategy.name} failed: ${e.message}")
             return@withContext false
         }
     }

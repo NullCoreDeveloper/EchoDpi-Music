@@ -2032,13 +2032,13 @@ class MusicService :
                                     .connectTimeout(5, TimeUnit.SECONDS)
                                     .readTimeout(8, TimeUnit.SECONDS)
                                     .callTimeout(10, TimeUnit.SECONDS)
-                                    .proxyAuthenticator { _, response ->
                                         YouTube.proxyAuth?.let { auth ->
                                             response.request.newBuilder()
                                                 .header("Proxy-Authorization", auth)
                                                 .build()
                                         } ?: response.request
                                     }
+                                    .apply { YouTube.customClientBuilder?.invoke(this) }
                                     .build(),
                             ),
                         ),
