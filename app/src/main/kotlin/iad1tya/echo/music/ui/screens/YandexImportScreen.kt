@@ -147,65 +147,99 @@ fun YandexImportScreen(
 
                             val foundIds = mutableListOf<String>()
                             val failed = mutableListOf<Pair<String, String>>()
-
-                            for ((index, pair) in importedSongs.withIndex()) {
-                                val (title, artist) = pair
-                                importProgress = index + 1
-                                statusText = "Searching: $title ($importProgress/$totalTracks)"
-
-                                val videoId = SpotifyImportHelper.searchYouTubeForSong(title, artist)
-                                if (videoId != null) {
-                                    foundIds.add(videoId)
-                                } else {
-                                    failed.add(pair)
+                            
+                            val concurrencyLimit = 5
+                            val semaphore = kotlinx.coroutines.sync.Semaphore(concurrencyLimit)
+                            
+                            val searchJobs = importedSongs.mapIndexed { index, pair ->
+                                scope.async {
+                                    semaphore.withPermit {
+                                        val (title, artist) = pair
+                                        val videoId = SpotifyImportHelper.searchYouTubeForSong(title, artist)
+                                        
+                                        withContext(Dispatchers.Main) {
+                                            importProgress++
+                                            statusText = "Searching: $title ($importProgress/$totalTracks)"
+                                        }
+                                        
+                                        if (videoId != null) {
+                                            synchronized(foundIds) { foundIds.add(videoId) }
+                                        } else {
+                                            synchronized(failed) { failed.add(pair) }
+                                        }
+                                        
+                                        // Small delay to be polite to YouTube
+                                        delay(Random.nextLong(200, 500))
+                                    }
                                 }
                             }
+                            searchJobs.awaitAll()
 
                             // Second pass for failed songs using FILTER_VIDEO
                             if (failed.isNotEmpty()) {
                                 statusText = "Searching ${failed.size} failed songs as video..."
                                 val stillFailed = mutableListOf<Pair<String, String>>()
-                                for (pair in failed) {
-                                    val (title, artist) = pair
-                                    val videoId = SpotifyImportHelper.searchYouTubeForVideo(title, artist)
-                                    if (videoId != null) {
-                                        foundIds.add(videoId)
-                                    } else {
-                                        stillFailed.add(pair)
+                                
+                                val videoSearchJobs = failed.map { pair ->
+                                    scope.async {
+                                        semaphore.withPermit {
+                                            val (title, artist) = pair
+                                            val videoId = SpotifyImportHelper.searchYouTubeForVideo(title, artist)
+                                            if (videoId != null) {
+                                                synchronized(foundIds) { foundIds.add(videoId) }
+                                            } else {
+                                                synchronized(stillFailed) { stillFailed.add(pair) }
+                                            }
+                                            delay(Random.nextLong(200, 500))
+                                        }
                                     }
                                 }
+                                videoSearchJobs.awaitAll()
                                 failed.clear()
                                 failed.addAll(stillFailed)
                             }
+                            
                             // Create playlist with found songs
                             if (foundIds.isNotEmpty()) {
+                                statusText = "Fetching metadata for ${foundIds.size} tracks..."
                                 withContext(Dispatchers.IO) {
-                                    val songMetadataList = foundIds.mapNotNull { songId ->
+                                    val songMetadataList = mutableListOf<Pair<String, iad1tya.echo.music.models.MediaMetadata>>()
+                                    
+                                    // Batch metadata fetching (max 50 per request)
+                                    for (i in 0 until foundIds.size step 50) {
+                                        val batch = foundIds.subList(i, minOf(i + 50, foundIds.size))
                                         try {
-                                            com.echo.innertube.YouTube.queue(listOf(songId))
-                                                .getOrNull()?.firstOrNull()?.let { ytSong ->
-                                                    songId to ytSong.toMediaMetadata()
-                                                }
-                                        } catch (_: Exception) { null }
+                                            val ytSongs = com.echo.innertube.YouTube.queue(batch)
+                                                .getOrNull().orEmpty()
+                                            
+                                            ytSongs.forEach { ytSong ->
+                                                songMetadataList.add(ytSong.id to ytSong.toMediaMetadata())
+                                            }
+                                        } catch (e: Exception) {
+                                            Timber.e(e, "Failed to fetch metadata batch")
+                                        }
+                                        delay(500)
                                     }
                                     
-                                    database.query {
-                                        val playlist = PlaylistEntity(
-                                            name = playlistName,
-                                            browseId = null,
-                                            bookmarkedAt = LocalDateTime.now(),
-                                            isEditable = true,
-                                        )
-                                        insert(playlist)
-                                        songMetadataList.forEachIndexed { idx, (songId, metadata) ->
-                                            insert(metadata)
-                                            insert(
-                                                PlaylistSongMap(
-                                                    songId = songId,
-                                                    playlistId = playlist.id,
-                                                    position = idx
-                                                )
+                                    if (songMetadataList.isNotEmpty()) {
+                                        database.query {
+                                            val playlist = PlaylistEntity(
+                                                name = playlistName,
+                                                browseId = null,
+                                                bookmarkedAt = LocalDateTime.now(),
+                                                isEditable = true,
                                             )
+                                            insert(playlist)
+                                            songMetadataList.forEachIndexed { idx, (songId, metadata) ->
+                                                insert(metadata)
+                                                insert(
+                                                    PlaylistSongMap(
+                                                        songId = songId,
+                                                        playlistId = playlist.id,
+                                                        position = idx
+                                                    )
+                                                )
+                                            }
                                         }
                                     }
                                 }
