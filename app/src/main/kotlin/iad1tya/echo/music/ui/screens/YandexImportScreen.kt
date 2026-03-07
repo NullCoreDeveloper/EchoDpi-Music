@@ -29,8 +29,14 @@ import iad1tya.echo.music.utils.SpotifyImportHelper
 import iad1tya.echo.music.utils.YandexImportHelper
 import java.time.LocalDateTime
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import timber.log.Timber
+import kotlin.random.Random
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -151,7 +157,7 @@ fun YandexImportScreen(
                             val concurrencyLimit = 5
                             val semaphore = kotlinx.coroutines.sync.Semaphore(concurrencyLimit)
                             
-                            val searchJobs = importedSongs.mapIndexed { index, pair ->
+                            val searchJobs = importedSongs.mapIndexed { _, pair: Pair<String, String> ->
                                 scope.async {
                                     semaphore.withPermit {
                                         val (title, artist) = pair
@@ -180,7 +186,7 @@ fun YandexImportScreen(
                                 statusText = "Searching ${failed.size} failed songs as video..."
                                 val stillFailed = mutableListOf<Pair<String, String>>()
                                 
-                                val videoSearchJobs = failed.map { pair ->
+                                val videoSearchJobs = failed.map { pair: Pair<String, String> ->
                                     scope.async {
                                         semaphore.withPermit {
                                             val (title, artist) = pair
