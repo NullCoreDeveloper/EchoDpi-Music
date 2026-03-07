@@ -146,7 +146,7 @@ fun SpotifyImportScreen(
                             statusText = "Importing to Echo Music..."
 
                             val foundIds = mutableListOf<String>()
-                            val failed = mutableListOf<String>()
+                            val failed = mutableListOf<Pair<String, String>>()
 
                             for ((index, pair) in importedSongs.withIndex()) {
                                 val (title, artist) = pair
