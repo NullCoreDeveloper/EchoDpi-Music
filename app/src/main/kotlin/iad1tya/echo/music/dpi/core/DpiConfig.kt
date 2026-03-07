@@ -34,14 +34,14 @@ class DpiDns : Dns {
 
 fun okhttp3.OkHttpClient.Builder.applyDpi(): okhttp3.OkHttpClient.Builder {
     try {
-        val defaultFactory = javax.net.SocketFactory.getDefault()
-        val dpiFactory = DpiSocketFactory(
-            delegate = defaultFactory,
-            getStrategy = { DpiConfig.currentStrategy },
-            getCustomParams = { DpiConfig.customParams },
-            getIsEnabled = { DpiConfig.isEnabled }
-        )
-        socketFactory(dpiFactory)
+        if (DpiConfig.isEnabled && (DpiConfig.currentStrategy != DpiStrategy.DEFAULT || DpiConfig.customParams.isNotBlank())) {
+            LocalDpiProxyServer.start()
+            if (LocalDpiProxyServer.port > 0) {
+                proxy(java.net.Proxy(java.net.Proxy.Type.HTTP, java.net.InetSocketAddress("127.0.0.1", LocalDpiProxyServer.port)))
+            }
+        } else {
+            proxy(java.net.Proxy.NO_PROXY)
+        }
         dns(DpiDns())
         protocols(listOf(Protocol.HTTP_1_1))
     } catch (e: Exception) {

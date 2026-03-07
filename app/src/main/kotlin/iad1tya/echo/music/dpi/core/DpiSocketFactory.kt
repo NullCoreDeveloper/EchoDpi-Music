@@ -153,13 +153,6 @@ class DpiOutputStream(
                     if (bytesWritten < len) {
                         Thread.sleep(delayMs)
                     }
-                    
-                    // Агрессивная нарезка только для начала пакета (первые 100 байт)
-                    // Остальное пишем одним куском для скорости
-                    if (bytesWritten > 100) {
-                        delegate.write(b, off + bytesWritten, len - bytesWritten)
-                        break
-                    }
                 }
                 delegate.flush()
             } catch (e: Exception) {
