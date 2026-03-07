@@ -50,7 +50,7 @@ private val client = HttpClient {
     }
 
     defaultRequest {
-        header(HttpHeaders.UserAgent, "Echo Music (https://github.com/iad1tya/Echo-Music)")
+        header(HttpHeaders.UserAgent, "EchoDpi Music (https://github.com/NullCoreDeveloper/EchoDpi-Music)")
     }
 }
 

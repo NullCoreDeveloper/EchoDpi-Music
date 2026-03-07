@@ -70,7 +70,7 @@ We are committed to providing a welcoming and inspiring community for all. We pl
    ```
 3. Add the upstream repository:
    ```bash
-   git remote add upstream https://github.com/iad1tya/Echo-Music.git
+   git remote add upstream https://github.com/NullCoreDeveloper/EchoDpi-Music.git
    ```
 
 ## Development Setup
