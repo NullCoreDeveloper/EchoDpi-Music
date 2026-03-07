@@ -1,48 +1,39 @@
 package iad1tya.echo.music.dpi.core
 
-import java.io.FilterOutputStream
 import java.io.InputStream
 import java.io.OutputStream
 import java.net.InetAddress
 import java.net.Socket
-import javax.net.ssl.HandshakeCompletedListener
-import javax.net.ssl.SSLParameters
-import javax.net.ssl.SSLSession
-import javax.net.ssl.SSLSocket
-import javax.net.ssl.SSLSocketFactory
+import javax.net.SocketFactory
 
 class DpiSocketFactory(
-    private val delegate: SSLSocketFactory,
+    private val delegate: SocketFactory,
     private val getStrategy: () -> DpiStrategy,
     private val getCustomParams: () -> String,
     private val getIsEnabled: () -> Boolean
-) : SSLSocketFactory() {
+) : SocketFactory() {
 
-    override fun getDefaultCipherSuites(): Array<String> = delegate.defaultCipherSuites
-    override fun getSupportedCipherSuites(): Array<String> = delegate.supportedCipherSuites
-
-    override fun createSocket(s: Socket?, host: String?, port: Int, autoClose: Boolean): Socket {
-        val socket = delegate.createSocket(s, host, port, autoClose) as SSLSocket
-        return wrapSocket(socket)
+    override fun createSocket(): Socket {
+        return wrapSocket(delegate.createSocket())
     }
 
     override fun createSocket(host: String?, port: Int): Socket {
-        return wrapSocket(delegate.createSocket(host, port) as SSLSocket)
+        return wrapSocket(delegate.createSocket(host, port))
     }
 
     override fun createSocket(host: String?, port: Int, localHost: InetAddress?, localPort: Int): Socket {
-        return wrapSocket(delegate.createSocket(host, port, localHost, localPort) as SSLSocket)
+        return wrapSocket(delegate.createSocket(host, port, localHost, localPort))
     }
 
     override fun createSocket(host: InetAddress?, port: Int): Socket {
-        return wrapSocket(delegate.createSocket(host, port) as SSLSocket)
+        return wrapSocket(delegate.createSocket(host, port))
     }
 
     override fun createSocket(address: InetAddress?, port: Int, localAddress: InetAddress?, localPort: Int): Socket {
-        return wrapSocket(delegate.createSocket(address, port, localAddress, localPort) as SSLSocket)
+        return wrapSocket(delegate.createSocket(address, port, localAddress, localPort))
     }
 
-    private fun wrapSocket(socket: SSLSocket): Socket {
+    private fun wrapSocket(socket: Socket): Socket {
         val strat = getStrategy()
         val param = getCustomParams()
         val enabled = getIsEnabled()
@@ -52,43 +43,16 @@ class DpiSocketFactory(
         }
         
         socket.tcpNoDelay = true
-
         return DpiSocketWrapper(socket, strat, param)
     }
 }
 
 class DpiSocketWrapper(
-    private val delegate: SSLSocket,
+    private val delegate: Socket,
     private val strategy: DpiStrategy,
     private val params: String
-) : SSLSocket() {
-
-    override fun getOutputStream(): OutputStream {
-        return DpiOutputStream(delegate.outputStream, strategy, params)
-    }
-
-    override fun getSupportedCipherSuites(): Array<String> = delegate.supportedCipherSuites
-    override fun getEnabledCipherSuites(): Array<String> = delegate.enabledCipherSuites
-    override fun setEnabledCipherSuites(p0: Array<String>?) { delegate.enabledCipherSuites = p0 }
-    override fun getSupportedProtocols(): Array<String> = delegate.supportedProtocols
-    override fun getEnabledProtocols(): Array<String> = delegate.enabledProtocols
-    override fun setEnabledProtocols(p0: Array<String>?) { delegate.enabledProtocols = p0 }
-    override fun getSession(): SSLSession = delegate.session
-    override fun addHandshakeCompletedListener(p0: HandshakeCompletedListener?) = delegate.addHandshakeCompletedListener(p0)
-    override fun removeHandshakeCompletedListener(p0: HandshakeCompletedListener?) = delegate.removeHandshakeCompletedListener(p0)
-    override fun startHandshake() = delegate.startHandshake()
-    override fun setUseClientMode(p0: Boolean) { delegate.useClientMode = p0 }
-    override fun getUseClientMode(): Boolean = delegate.useClientMode
-    override fun setNeedClientAuth(p0: Boolean) { delegate.needClientAuth = p0 }
-    override fun getNeedClientAuth(): Boolean = delegate.needClientAuth
-    override fun setWantClientAuth(p0: Boolean) { delegate.wantClientAuth = p0 }
-    override fun getWantClientAuth(): Boolean = delegate.wantClientAuth
-    override fun setEnableSessionCreation(p0: Boolean) { delegate.enableSessionCreation = p0 }
-    override fun getEnableSessionCreation(): Boolean = delegate.enableSessionCreation
-    override fun getSSLParameters(): SSLParameters = delegate.sslParameters
-    override fun setSSLParameters(params: SSLParameters?) { delegate.sslParameters = params }
-
-    // Унаследованные методы от Socket
+) : Socket() {
+    
     override fun connect(endpoint: java.net.SocketAddress?) = delegate.connect(endpoint)
     override fun connect(endpoint: java.net.SocketAddress?, timeout: Int) = delegate.connect(endpoint, timeout)
     override fun bind(bindpoint: java.net.SocketAddress?) = delegate.bind(bindpoint)
@@ -100,6 +64,7 @@ class DpiSocketWrapper(
     override fun getLocalSocketAddress() = delegate.localSocketAddress
     override fun getChannel() = delegate.channel
     override fun getInputStream(): InputStream = delegate.inputStream
+    override fun getOutputStream(): OutputStream = DpiOutputStream(delegate, delegate.outputStream, strategy, params)
     override fun setTcpNoDelay(on: Boolean) { delegate.tcpNoDelay = on }
     override fun getTcpNoDelay(): Boolean = delegate.tcpNoDelay
     override fun setSoLinger(on: Boolean, linger: Int) { delegate.setSoLinger(on, linger) }
@@ -130,38 +95,88 @@ class DpiSocketWrapper(
 }
 
 class DpiOutputStream(
-    out: OutputStream,
+    private val socket: Socket,
+    private val delegate: OutputStream,
     private val strategy: DpiStrategy,
     private val params: String
-) : FilterOutputStream(out) {
+) : OutputStream() {
+    private var isFirstPacket = true
+
+    override fun write(b: Int) {
+        delegate.write(b)
+    }
+
+    override fun write(b: ByteArray) {
+        write(b, 0, b.size)
+    }
+
     override fun write(b: ByteArray, off: Int, len: Int) {
-        val useSplit = strategy == DpiStrategy.SPLIT_1 || strategy == DpiStrategy.SPLIT_2 || params.contains("-s")
-        val useFake = strategy == DpiStrategy.FAKE_SPLIT || params.contains("-f")
-        val useDisorder = strategy == DpiStrategy.DISORDER_1 || params.contains("-d")
-
-        try {
-            if (useFake) {
-                // Пример инъекции Fake пакета - в реальности требует Raw Sockets
+        if (!isFirstPacket) {
+            delegate.write(b, off, len)
+            return
+        }
+        
+        // Перехватываем только первые данные в сокете. Если это начало пакета TLS (0x16 0x03):
+        if (len > 5 && b[off] == 0x16.toByte() && b[off + 1] == 0x03.toByte()) {
+            isFirstPacket = false
+            try {
+                when (strategy) {
+                    DpiStrategy.SPLIT_1 -> {
+                        delegate.write(b, off, 1) // First byte
+                        delegate.flush()
+                        Thread.sleep(10)
+                        delegate.write(b, off + 1, len - 1) // Remaining bytes
+                        delegate.flush()
+                    }
+                    DpiStrategy.SPLIT_2 -> {
+                        delegate.write(b, off, 1)
+                        delegate.flush()
+                        Thread.sleep(10)
+                        if (len > 4) {
+                            delegate.write(b, off + 1, 3)
+                            delegate.flush()
+                            Thread.sleep(10)
+                            delegate.write(b, off + 4, len - 4)
+                            delegate.flush()
+                        } else {
+                            delegate.write(b, off + 1, len - 1)
+                            delegate.flush()
+                        }
+                    }
+                    DpiStrategy.OOB_INJECT -> {
+                        delegate.write(b, off, 1)
+                        delegate.flush()
+                        try {
+                            socket.sendUrgentData(0x00) // OOB packet byte
+                        } catch (ignore: Exception) {} 
+                        Thread.sleep(10)
+                        delegate.write(b, off + 1, len - 1)
+                        delegate.flush()
+                    }
+                    DpiStrategy.SNI_FRAG -> {
+                        var offset = off
+                        val end = off + len
+                        while (offset < end) {
+                            val chunkLen = if (end - offset > 10) 10 else end - offset
+                            delegate.write(b, offset, chunkLen)
+                            delegate.flush()
+                            Thread.sleep(5)
+                            offset += chunkLen
+                        }
+                    }
+                    else -> {
+                        delegate.write(b, off, len)
+                    }
+                }
+            } catch (e: Exception) {
+                delegate.write(b, off, len) // Fallback just in case
             }
-
-            if (useSplit && len > 10) {
-                val splitPos = if (strategy == DpiStrategy.SPLIT_1) len / 2 else 5
-                
-                out.write(b, off, splitPos)
-                out.flush()
-                
-                Thread.sleep(10) // Форсируем фрагментацию
-                
-                out.write(b, off + splitPos, len - splitPos)
-                out.flush()
-            } else if (useDisorder) {
-                // Disorder абстракция
-                out.write(b, off, len)
-            } else {
-                out.write(b, off, len)
-            }
-        } catch (e: Exception) {
-            out.write(b, off, len)
+        } else {
+            // Если это не TLS Handshake (возможно, просто HTTP трафик или что-то другое)
+            delegate.write(b, off, len)
         }
     }
+    
+    override fun flush() = delegate.flush()
+    override fun close() = delegate.close()
 }

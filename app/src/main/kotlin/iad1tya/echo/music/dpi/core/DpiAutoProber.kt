@@ -1,25 +1,26 @@
 package iad1tya.echo.music.dpi.core
 
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import java.util.concurrent.TimeUnit
+import javax.net.SocketFactory
 
 class DpiAutoProber {
     suspend fun findOptimalStrategy(
         onProgress: suspend (Int, Int, DpiStrategy) -> Unit
     ): DpiStrategy? = withContext(Dispatchers.IO) {
         val strategiesToTest = listOf(
+            DpiStrategy.DEFAULT,
             DpiStrategy.SPLIT_1,
             DpiStrategy.SPLIT_2,
-            DpiStrategy.DISORDER_1,
-            DpiStrategy.FAKE_SPLIT
+            DpiStrategy.OOB_INJECT,
+            DpiStrategy.SNI_FRAG
         )
 
         for ((index, strategy) in strategiesToTest.withIndex()) {
             onProgress(index + 1, strategiesToTest.size, strategy)
-            
-            // Искусственная задержка для демо-эффекта визуального перебора
-            delay(1200)
             
             if (testStrategy(strategy)) {
                 return@withContext strategy
@@ -31,24 +32,36 @@ class DpiAutoProber {
 
     private suspend fun testStrategy(strategy: DpiStrategy): Boolean = withContext(Dispatchers.IO) {
         try {
-            // Пример реальной реализации:
-            // val sslContext = SSLContext.getInstance("TLS")
-            // sslContext.init(null, null, null)
-            // val defaultSslSocketFactory = sslContext.socketFactory
-            // val customSslSocketFactory = DpiSocketFactory(defaultSslSocketFactory, { strategy }, { "" }, { true })
-            // val client = OkHttpClient.Builder()
-            //     .sslSocketFactory(customSslSocketFactory, defaultTrustManager())
-            //     .connectTimeout(3, TimeUnit.SECONDS)
-            //     .readTimeout(3, TimeUnit.SECONDS)
-            //     .build()
-            // val request = Request.Builder().url("https://googlevideo.com/").build()
-            // val response = client.newCall(request).execute()
-            // return response.isSuccessful || response.code == 404
+            val defaultFactory = SocketFactory.getDefault()
+            val customSocketFactory = DpiSocketFactory(
+                delegate = defaultFactory,
+                getStrategy = { strategy },
+                getCustomParams = { "" },
+                getIsEnabled = { true }
+            )
             
-            // Для демо-эффекта эмулируем успех на последней стратегии
-            strategy == DpiStrategy.FAKE_SPLIT 
+            val client = OkHttpClient.Builder()
+                .socketFactory(customSocketFactory)
+                .connectTimeout(4, TimeUnit.SECONDS)
+                .readTimeout(4, TimeUnit.SECONDS)
+                .build()
+
+            val request = Request.Builder()
+                // youtubei.googleapis.com is an essential YT Music endpoint blocked by DPI in RF
+                .url("https://youtubei.googleapis.com/generate_204")
+                .head() // Use HEAD to minimize bandwidth during tests
+                .build()
+
+            val response = client.newCall(request).execute()
+            val code = response.code
+            response.close()
+            
+            // Если мы получили ЛЮБОЙ HTTP-ответ от сервера (даже 404), значит TLS Handshake прошел
+            // и провайдер (ТСПУ) не сбросил соединение по SNI.
+            return@withContext true
         } catch (e: Exception) {
-            false
+            // Connection reset by peer, Timeout, SSLHandshakeException -> DPI сбросил/замедлил соединение
+            return@withContext false
         }
     }
 }

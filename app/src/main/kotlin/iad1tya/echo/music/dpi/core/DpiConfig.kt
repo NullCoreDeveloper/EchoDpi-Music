@@ -17,23 +17,16 @@ object DpiConfig {
     fun applyTo(builder: okhttp3.OkHttpClient.Builder) = builder.applyDpi()
 }
 
-fun getDefaultTrustManager(): javax.net.ssl.X509TrustManager {
-    val factory = javax.net.ssl.TrustManagerFactory.getInstance(javax.net.ssl.TrustManagerFactory.getDefaultAlgorithm())
-    factory.init(null as java.security.KeyStore?)
-    return factory.trustManagers.first { it is javax.net.ssl.X509TrustManager } as javax.net.ssl.X509TrustManager
-}
-
 fun okhttp3.OkHttpClient.Builder.applyDpi(): okhttp3.OkHttpClient.Builder {
     try {
-        val trustManager = getDefaultTrustManager()
-        val defaultFactory = javax.net.ssl.SSLContext.getDefault().socketFactory as javax.net.ssl.SSLSocketFactory
+        val defaultFactory = javax.net.SocketFactory.getDefault()
         val dpiFactory = DpiSocketFactory(
             delegate = defaultFactory,
             getStrategy = { DpiConfig.currentStrategy },
             getCustomParams = { DpiConfig.customParams },
             getIsEnabled = { DpiConfig.isEnabled }
         )
-        sslSocketFactory(dpiFactory, trustManager)
+        socketFactory(dpiFactory)
     } catch (e: Exception) {
         e.printStackTrace()
     }
