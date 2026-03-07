@@ -975,11 +975,11 @@ object YouTube {
         innerTube.createPlaylist(WEB_REMIX, title).body<CreatePlaylistResponse>().playlistId
     }
 
-    suspend fun renamePlaylist(playlistId: String, name: String) = runCatching {
+    suspend fun renamePlaylist(playlistId: String, name: String): Result<com.echo.innertube.models.response.EditPlaylistResponse> = runCatching<com.echo.innertube.models.response.EditPlaylistResponse> {
         innerTube.renamePlaylist(WEB_REMIX, playlistId, name)
     }
 
-    suspend fun uploadCustomThumbnailLink(playlistId: String, image: ByteArray) = runCatching {
+    suspend fun uploadCustomThumbnailLink(playlistId: String, image: ByteArray): Result<String?> = runCatching<String?> {
         val uploadUrl = innerTube.getUploadCustomThumbnailLink(WEB_REMIX, image.size).headers["x-guploader-uploadid"]
         val blobReq = innerTube.uploadCustomThumbnail(
             WEB_REMIX,
@@ -987,14 +987,14 @@ object YouTube {
             image
         )
         val blobId = Json.decodeFromString<ImageUploadResponse>(blobReq.bodyAsText()).encryptedBlobId
-        innerTube.setThumbnailPlaylist(WEB_REMIX, playlistId, blobId).body<EditPlaylistResponse>().newHeader?.musicEditablePlaylistDetailHeaderRenderer?.header?.musicResponsiveHeaderRenderer?.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl()
+        innerTube.setThumbnailPlaylist(WEB_REMIX, playlistId, blobId).newHeader?.musicEditablePlaylistDetailHeaderRenderer?.header?.musicResponsiveHeaderRenderer?.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl()
     }
 
-    suspend fun removeThumbnailPlaylist(playlistId: String) = runCatching {
-        innerTube.removeThumbnailPlaylist(WEB_REMIX, playlistId).body<EditPlaylistResponse>().newHeader?.musicEditablePlaylistDetailHeaderRenderer?.header?.musicResponsiveHeaderRenderer?.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl()
+    suspend fun removeThumbnailPlaylist(playlistId: String): Result<String?> = runCatching<String?> {
+        innerTube.removeThumbnailPlaylist(WEB_REMIX, playlistId).newHeader?.musicEditablePlaylistDetailHeaderRenderer?.header?.musicResponsiveHeaderRenderer?.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl()
     }
 
-    suspend fun deletePlaylist(playlistId: String) = runCatching {
+    suspend fun deletePlaylist(playlistId: String): Result<io.ktor.client.statement.HttpResponse> = runCatching<io.ktor.client.statement.HttpResponse> {
         innerTube.deletePlaylist(WEB_REMIX, playlistId)
     }
 
