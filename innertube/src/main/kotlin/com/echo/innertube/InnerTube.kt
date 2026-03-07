@@ -6,8 +6,7 @@ import com.echo.innertube.models.ReturnYouTubeDislikeResponse
 import com.echo.innertube.models.YouTubeClient
 import com.echo.innertube.models.YouTubeLocale
 import com.echo.innertube.models.body.*
-import com.echo.innertube.models.response.EditPlaylistResponse
-import com.echo.innertube.models.response.NextResponse
+import com.echo.innertube.models.response.*
 import com.echo.innertube.utils.parseCookieString
 import com.echo.innertube.utils.sha1
 import io.ktor.client.*
@@ -400,7 +399,7 @@ class InnerTube {
                 }
             )
         )
-    }.body<EditPlaylistResponse>()
+    }.body<com.echo.innertube.models.response.EditPlaylistResponse>()
 
     suspend fun addPlaylistToPlaylist(
         client: YouTubeClient,
@@ -417,7 +416,7 @@ class InnerTube {
                 )
             )
         )
-    }.body<EditPlaylistResponse>()
+    }.body<com.echo.innertube.models.response.EditPlaylistResponse>()
 
     suspend fun removeFromPlaylist(
         client: YouTubeClient,
@@ -438,7 +437,7 @@ class InnerTube {
                 )
             )
         )
-    }.body<EditPlaylistResponse>()
+    }.body<com.echo.innertube.models.response.EditPlaylistResponse>()
 
     suspend fun moveSongPlaylist(
         client: YouTubeClient,
@@ -460,7 +459,7 @@ class InnerTube {
 
             )
         )
-    }.body<EditPlaylistResponse>()
+    }.body<com.echo.innertube.models.response.EditPlaylistResponse>()
 
     suspend fun createPlaylist(
         client: YouTubeClient,
@@ -492,7 +491,7 @@ class InnerTube {
                 )
             )
         )
-    }.body<EditPlaylistResponse>()
+    }.body<com.echo.innertube.models.response.EditPlaylistResponse>()
     
     suspend fun getUploadCustomThumbnailLink(
         client: YouTubeClient,
@@ -540,7 +539,7 @@ class InnerTube {
                 )
             )
         )
-    }.body<EditPlaylistResponse>()
+    }.body<com.echo.innertube.models.response.EditPlaylistResponse>()
 
     suspend fun removeThumbnailPlaylist(
         client: YouTubeClient,
@@ -556,7 +555,7 @@ class InnerTube {
                 )
             )
         )
-    }.body<EditPlaylistResponse>()
+    }.body<com.echo.innertube.models.response.EditPlaylistResponse>()
 
     suspend fun deletePlaylist(
         client: YouTubeClient,
