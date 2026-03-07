@@ -10,15 +10,24 @@ import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.echo.innertube.YouTube
-import iad1tya.echo.music.LocalDatabase
 import iad1tya.echo.music.R
 import iad1tya.echo.music.MainActivity
-import iad1tya.echo.music.models.Playlist
-import iad1tya.echo.music.models.PlaylistSong
+import iad1tya.echo.music.db.MusicDatabase
+import iad1tya.echo.music.db.entities.Playlist
+import iad1tya.echo.music.db.entities.PlaylistSong
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 import timber.log.Timber
+import java.util.ArrayList
+import javax.inject.Inject
 
+@AndroidEntryPoint
 class PlaylistSyncService : Service() {
+
+    @Inject
+    lateinit var database: MusicDatabase
+
 
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var notificationManager: NotificationManager? = null
@@ -31,7 +40,7 @@ class PlaylistSyncService : Service() {
         const val EXTRA_PLAYLIST_NAME = "extra_playlist_name"
         const val EXTRA_SONG_IDS = "extra_song_ids"
 
-        fun start(context: Context, playlistId: Long, playlistName: String, songIds: ArrayList<String>) {
+        fun start(context: Context, playlistId: String, playlistName: String, songIds: ArrayList<String>) {
             val intent = Intent(context, PlaylistSyncService::class.java).apply {
                 putExtra(EXTRA_PLAYLIST_ID, playlistId)
                 putExtra(EXTRA_PLAYLIST_NAME, playlistName)
@@ -52,11 +61,11 @@ class PlaylistSyncService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val playlistId = intent?.getLongExtra(EXTRA_PLAYLIST_ID, -1L) ?: -1L
+        val playlistId = intent?.getStringExtra(EXTRA_PLAYLIST_ID)
         val playlistName = intent?.getStringExtra(EXTRA_PLAYLIST_NAME) ?: "Playlist"
         val songIds = intent?.getStringArrayListExtra(EXTRA_SONG_IDS) ?: arrayListOf()
 
-        if (playlistId == -1L || songIds.isEmpty()) {
+        if (playlistId == null || songIds.isEmpty()) {
             stopSelf()
             return START_NOT_STICKY
         }
@@ -86,8 +95,7 @@ class PlaylistSyncService : Service() {
                 }
 
                 // 3. Update local database
-                val database = LocalDatabase.getInstance(this@PlaylistSyncService)
-                val playlistObj = database.query { playlist(playlistId) }
+                val playlistObj = database.playlist(playlistId).first()
                 if (playlistObj != null) {
                     database.query {
                         update(playlistObj.playlist.copy(browseId = newBrowseId))
