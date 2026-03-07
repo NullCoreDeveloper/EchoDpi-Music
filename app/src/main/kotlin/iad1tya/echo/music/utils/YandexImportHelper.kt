@@ -5,7 +5,9 @@ import com.google.gson.Gson
 import com.google.gson.JsonObject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.JavaNetCookieJar
+import okhttp3.Cookie
+import okhttp3.CookieJar
+import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.net.CookieManager
@@ -17,12 +19,33 @@ object YandexImportHelper {
     private val gson = Gson()
     
     // Use a persistent client with cookie support to mimic the Python session
-    private val cookieManager = CookieManager().apply {
-        setCookiePolicy(CookiePolicy.ACCEPT_ALL)
+    // Custom in-memory CookieJar instead of JavaNetCookieJar to prevent R8 crashes
+    private val cookieJar = object : CookieJar {
+        private val cookies = mutableMapOf<String, MutableList<Cookie>>()
+
+        override fun saveFromResponse(url: HttpUrl, newCookies: List<Cookie>) {
+            val validCookies = newCookies.filter { !it.name.isNullOrBlank() }
+            if (validCookies.isNotEmpty()) {
+                val current = cookies[url.host] ?: mutableListOf()
+                // Update or add cookies
+                validCookies.forEach { newCookie ->
+                    current.removeAll { it.name == newCookie.name }
+                    current.add(newCookie)
+                }
+                cookies[url.host] = current
+            }
+        }
+
+        override fun loadForRequest(url: HttpUrl): List<Cookie> {
+            val validCookies = cookies[url.host]?.filter { it.expiresAt > System.currentTimeMillis() } ?: emptyList()
+            // Clean up expired ones
+            cookies[url.host]?.removeAll { it.expiresAt <= System.currentTimeMillis() }
+            return validCookies
+        }
     }
-    
+
     private val client = OkHttpClient.Builder()
-        .cookieJar(JavaNetCookieJar(cookieManager))
+        .cookieJar(cookieJar)
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
         .build()
