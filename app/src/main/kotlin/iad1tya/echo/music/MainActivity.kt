@@ -449,7 +449,7 @@ class MainActivity : ComponentActivity() {
                 if (checkForUpdates) {
                     withContext(Dispatchers.IO) {
                         runCatching {
-                            val url = java.net.URL("https://api.github.com/repos/iad1tya/Echo-Music/releases/latest")
+                            val url = java.net.URL("https://api.github.com/repos/NullCoreDeveloper/EchoDpi-Music/releases/latest")
                             val connection = url.openConnection() as java.net.HttpURLConnection
                             connection.requestMethod = "GET"
                             connection.setRequestProperty("Accept", "application/json")
