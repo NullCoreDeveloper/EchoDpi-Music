@@ -529,8 +529,27 @@ class MainActivity : ComponentActivity() {
                 themeColor = DefaultThemeColor,
                 isDynamicColor = false,
             ) {
+                val isDpiConfigured by rememberPreference(iad1tya.echo.music.dpi.core.DpiConfig.IsDpiConfiguredKey, defaultValue = false)
+                val coroutineScope = rememberCoroutineScope()
+
+                if (!isDpiConfigured) {
+                    iad1tya.echo.music.dpi.ui.OnboardingScreen(
+                        onConfigured = { strategy ->
+                            coroutineScope.launch(Dispatchers.IO) {
+                                dataStore.edit { preferences ->
+                                    if (strategy != null) {
+                                        preferences[iad1tya.echo.music.dpi.core.DpiConfig.DpiStrategyKey] = strategy.name
+                                        preferences[iad1tya.echo.music.dpi.core.DpiConfig.DpiEnabledKey] = true
+                                    }
+                                    preferences[iad1tya.echo.music.dpi.core.DpiConfig.IsDpiConfiguredKey] = true
+                                }
+                            }
+                        }
+                    )
+                    return@EchoTheme
+                }
+
                 BoxWithConstraints(
-                        modifier =
                         Modifier
                             .fillMaxSize()
                             .background(

@@ -82,7 +82,8 @@ import iad1tya.echo.music.ui.utils.ShowMediaInfo
 import iad1tya.echo.music.ui.player.VideoPlayerScreen
 import iad1tya.echo.music.utils.rememberEnumPreference
 import iad1tya.echo.music.utils.rememberPreference
-
+import androidx.datastore.preferences.core.edit
+import iad1tya.echo.music.utils.dataStore
 
 @OptIn(ExperimentalMaterial3Api::class)
 fun NavGraphBuilder.navigationBuilder(
@@ -345,6 +346,42 @@ fun NavGraphBuilder.navigationBuilder(
     }
     composable("settings/privacy") {
         PrivacySettings(navController, scrollBehavior)
+    }
+    composable("settings/dpi") {
+        val context = androidx.compose.ui.platform.LocalContext.current
+        val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
+        val currentEnabled by iad1tya.echo.music.utils.rememberPreference(iad1tya.echo.music.dpi.core.DpiConfig.DpiEnabledKey, defaultValue = true)
+        val currentStrategyName by iad1tya.echo.music.utils.rememberPreference(iad1tya.echo.music.dpi.core.DpiConfig.DpiStrategyKey, defaultValue = iad1tya.echo.music.dpi.core.DpiStrategy.DEFAULT.name)
+        val currentStrategy = iad1tya.echo.music.dpi.core.DpiStrategy.valueOf(currentStrategyName)
+        val currentParams by iad1tya.echo.music.utils.rememberPreference(iad1tya.echo.music.dpi.core.DpiConfig.DpiCustomParamsKey, defaultValue = "")
+
+        iad1tya.echo.music.dpi.ui.DpiSettingsScreen(
+            currentEnabled = currentEnabled,
+            onEnabledChange = { enabled ->
+                coroutineScope.kotlinx.coroutines.launch(kotlinx.coroutines.Dispatchers.IO) {
+                    iad1tya.echo.music.utils.dataStore(context).edit {
+                        it[iad1tya.echo.music.dpi.core.DpiConfig.DpiEnabledKey] = enabled
+                    }
+                }
+            },
+            currentStrategy = currentStrategy,
+            onStrategyChange = { strategy ->
+                coroutineScope.kotlinx.coroutines.launch(kotlinx.coroutines.Dispatchers.IO) {
+                    iad1tya.echo.music.utils.dataStore(context).edit {
+                        it[iad1tya.echo.music.dpi.core.DpiConfig.DpiStrategyKey] = strategy.name
+                    }
+                }
+            },
+            currentParams = currentParams,
+            onParamsChange = { params ->
+                coroutineScope.kotlinx.coroutines.launch(kotlinx.coroutines.Dispatchers.IO) {
+                    iad1tya.echo.music.utils.dataStore(context).edit {
+                        it[iad1tya.echo.music.dpi.core.DpiConfig.DpiCustomParamsKey] = params
+                    }
+                }
+            },
+            onBack = { navController.navigateUp() }
+        )
     }
     composable("settings/backup_restore") {
         BackupAndRestore(navController, scrollBehavior)
