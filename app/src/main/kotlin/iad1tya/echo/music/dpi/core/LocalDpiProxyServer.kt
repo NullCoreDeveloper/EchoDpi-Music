@@ -49,54 +49,116 @@ object LocalDpiProxyServer {
             val clientIn = clientSocket.getInputStream()
             val clientOut = clientSocket.getOutputStream()
 
-            val buffer = ByteArray(8192)
-            var totalRead = 0
-            var headersEndIndex = -1
+            val firstByte = clientIn.read()
+            if (firstByte == -1) return@withContext
 
-            while (true) {
-                val bytesRead = clientIn.read(buffer, totalRead, buffer.size - totalRead)
-                if (bytesRead == -1) return@withContext
-                totalRead += bytesRead
+            var host: String = ""
+            var targetPort: Int = 443
+            var initialPayload: ByteArray? = null
+
+            if (firstByte == 0x05) {
+                // SOCKS5 Handshake
+                val nMethods = clientIn.read()
+                if (nMethods == -1) return@withContext
+                val methods = ByteArray(nMethods)
+                clientIn.read(methods)
                 
-                // look for \r\n\r\n
-                for (i in 0 until totalRead - 3) {
-                    if (buffer[i].toInt() == 13 && buffer[i+1].toInt() == 10 &&
-                        buffer[i+2].toInt() == 13 && buffer[i+3].toInt() == 10) {
-                        headersEndIndex = i
-                        break
-                    }
-                }
-                
-                if (headersEndIndex != -1) break
-                
-                if (totalRead >= buffer.size) {
+                // No authentication requested
+                clientOut.write(byteArrayOf(0x05, 0x00))
+                clientOut.flush()
+
+                // Request
+                val ver = clientIn.read()
+                val cmd = clientIn.read()
+                val rsv = clientIn.read()
+                val atyp = clientIn.read()
+
+                if (ver != 0x05 || cmd != 0x01) { // Only CONNECT supported
+                    clientOut.write(byteArrayOf(0x05, 0x07, 0x00, 0x01, 0, 0, 0, 0, 0, 0))
                     return@withContext
                 }
-            }
 
-            val requestHeader = String(buffer, 0, headersEndIndex, Charsets.US_ASCII)
-            val lines = requestHeader.split("\r\n")
-            if (lines.isEmpty()) return@withContext
+                when (atyp) {
+                    0x01 -> { // IPv4
+                        val addr = ByteArray(4)
+                        clientIn.read(addr)
+                        host = java.net.InetAddress.getByAddress(addr).hostAddress
+                    }
+                    0x03 -> { // Domain name
+                        val len = clientIn.read()
+                        val addr = ByteArray(len)
+                        clientIn.read(addr)
+                        host = String(addr)
+                    }
+                    0x04 -> { // IPv6
+                        val addr = ByteArray(16)
+                        clientIn.read(addr)
+                        host = java.net.InetAddress.getByAddress(addr).hostAddress
+                    }
+                    else -> return@withContext
+                }
 
-            val requestLine = lines[0]
-            if (!requestLine.startsWith("CONNECT", ignoreCase = true)) {
-                clientOut.write("HTTP/1.1 405 Method Not Allowed\r\n\r\n".toByteArray())
+                targetPort = ((clientIn.read() and 0xFF) shl 8) or (clientIn.read() and 0xFF)
+                
+                // Success response (dummy BND.ADDR/PORT)
+                clientOut.write(byteArrayOf(0x05, 0x00, 0x00, 0x01, 0, 0, 0, 0, 0, 0))
+                clientOut.flush()
+            } else if (firstByte.toChar() == 'C') {
+                // Potential HTTP CONNECT (starts with 'C' for CONNECT)
+                val buffer = ByteArray(8192)
+                buffer[0] = firstByte.toByte()
+                var totalRead = 1
+                var headersEndIndex = -1
+
+                while (true) {
+                    val bytesRead = clientIn.read(buffer, totalRead, buffer.size - totalRead)
+                    if (bytesRead == -1) return@withContext
+                    totalRead += bytesRead
+                    
+                    for (i in 0 until totalRead - 3) {
+                        if (buffer[i].toInt() == 13 && buffer[i+1].toInt() == 10 &&
+                            buffer[i+2].toInt() == 13 && buffer[i+3].toInt() == 10) {
+                            headersEndIndex = i
+                            break
+                        }
+                    }
+                    if (headersEndIndex != -1) break
+                    if (totalRead >= buffer.size) return@withContext
+                }
+
+                val requestHeader = String(buffer, 0, headersEndIndex, Charsets.US_ASCII)
+                val lines = requestHeader.split("\r\n")
+                if (lines.isEmpty() || !lines[0].startsWith("CONNECT", ignoreCase = true)) {
+                    clientOut.write("HTTP/1.1 405 Method Not Allowed\r\n\r\n".toByteArray())
+                    return@withContext
+                }
+
+                val parts = lines[0].split(" ")
+                if (parts.size < 2) return@withContext
+                val hostPort = parts[1]
+                val hpParts = hostPort.split(":")
+                host = hpParts[0]
+                targetPort = if (hpParts.size > 1) hpParts[1].toIntOrNull() ?: 443 else 443
+                
+                clientOut.write("HTTP/1.1 200 Connection established\r\n\r\n".toByteArray())
+                clientOut.flush()
+                
+                val remaining = totalRead - headersEndIndex - 4
+                if (remaining > 0) {
+                    initialPayload = buffer.copyOfRange(headersEndIndex + 4, totalRead)
+                }
+            } else {
                 return@withContext
             }
 
-            val parts = requestLine.split(" ")
-            if (parts.size < 2) return@withContext
-            val hostPort = parts[1]
-            val hpParts = hostPort.split(":")
-            val host = hpParts[0]
-            val targetPort = if (hpParts.size > 1) hpParts[1].toIntOrNull() ?: 443 else 443
-
+            // Connection logic
             val addresses = DpiDns().lookup(host)
             var connected = false
             for (addr in addresses) {
                 try {
                     targetSocket = Socket()
-                    targetSocket.connect(InetSocketAddress(addr, targetPort), 10000)
+                    targetSocket.tcpNoDelay = true
+                    targetSocket.connect(InetSocketAddress(addr, targetPort), 5000) // Reduced timeout for speed
                     connected = true
                     break
                 } catch (e: Exception) {
@@ -105,12 +167,13 @@ object LocalDpiProxyServer {
             }
 
             if (!connected || targetSocket == null) {
-                clientOut.write("HTTP/1.1 502 Bad Gateway\r\n\r\n".toByteArray())
+                if (firstByte == 0x05) {
+                    // SOCKS5 Failure could be sent here, but usually it's better to just close
+                } else {
+                    clientOut.write("HTTP/1.1 502 Bad Gateway\r\n\r\n".toByteArray())
+                }
                 return@withContext
             }
-
-            clientOut.write("HTTP/1.1 200 Connection established\r\n\r\n".toByteArray())
-            clientOut.flush()
 
             val targetOutRaw = targetSocket.getOutputStream()
             val targetOut = DpiOutputStream(
@@ -121,9 +184,8 @@ object LocalDpiProxyServer {
             )
             val targetIn = targetSocket.getInputStream()
 
-            val initialRemaining = totalRead - headersEndIndex - 4
-            if (initialRemaining > 0) {
-                targetOut.write(buffer, headersEndIndex + 4, initialRemaining)
+            if (initialPayload != null) {
+                targetOut.write(initialPayload)
                 targetOut.flush()
             }
 

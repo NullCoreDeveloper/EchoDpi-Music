@@ -22,13 +22,29 @@ object DpiConfig {
 }
 
 class DpiDns : Dns {
+    private val cache = mutableMapOf<String, Pair<List<InetAddress>, Long>>()
+    private val cacheTtlMs = 10 * 60 * 1000L // 10 minutes
+
     override fun lookup(hostname: String): List<InetAddress> {
-        val addresses = Dns.SYSTEM.lookup(hostname)
-        if (!DpiConfig.isEnabled || (DpiConfig.currentStrategy == DpiStrategy.DEFAULT && DpiConfig.customParams.isBlank())) {
-            return addresses
+        val now = System.currentTimeMillis()
+        cache[hostname]?.let { (addresses, timestamp) ->
+            if (now - timestamp < cacheTtlMs) {
+                return addresses
+            }
         }
-        val ipv4Only = addresses.filterIsInstance<Inet4Address>()
-        return ipv4Only.ifEmpty { addresses }
+
+        val addresses = Dns.SYSTEM.lookup(hostname)
+        val result = if (!DpiConfig.isEnabled || (DpiConfig.currentStrategy == DpiStrategy.DEFAULT && DpiConfig.customParams.isBlank())) {
+            addresses
+        } else {
+            val ipv4Only = addresses.filterIsInstance<Inet4Address>()
+            ipv4Only.ifEmpty { addresses }
+        }
+        
+        synchronized(cache) {
+            cache[hostname] = result to now
+        }
+        return result
     }
 }
 
@@ -37,7 +53,7 @@ fun okhttp3.OkHttpClient.Builder.applyDpi(): okhttp3.OkHttpClient.Builder {
         if (DpiConfig.isEnabled && (DpiConfig.currentStrategy != DpiStrategy.DEFAULT || DpiConfig.customParams.isNotBlank())) {
             LocalDpiProxyServer.start()
             if (LocalDpiProxyServer.port > 0) {
-                proxy(java.net.Proxy(java.net.Proxy.Type.HTTP, java.net.InetSocketAddress("127.0.0.1", LocalDpiProxyServer.port)))
+                proxy(java.net.Proxy(java.net.Proxy.Type.SOCKS, java.net.InetSocketAddress("127.0.0.1", LocalDpiProxyServer.port)))
             }
         } else {
             proxy(java.net.Proxy.NO_PROXY)
