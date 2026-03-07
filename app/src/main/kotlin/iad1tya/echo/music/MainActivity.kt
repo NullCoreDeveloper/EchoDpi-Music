@@ -464,7 +464,8 @@ class MainActivity : ComponentActivity() {
                                 withContext(Dispatchers.Main) {
                                     latestVersionName = version
                                     // Show notification if new version is available
-                                    if (version != BuildConfig.VERSION_NAME) {
+                                    val currentVersion = BuildConfig.VERSION_NAME.removePrefix("v")
+                                    if (version != currentVersion) {
                                         showUpdateNotification(this@MainActivity, version)
                                     }
                                 }

@@ -119,23 +119,24 @@ class DpiOutputStream(
         // Перехватываем только первые данные в сокете. Если это начало пакета TLS (0x16 0x03):
         if (len > 5 && b[off] == 0x16.toByte() && b[off + 1] == 0x03.toByte()) {
             isFirstPacket = false
+            // ... (rest of the logic stays the same but isFirstPacket is now false at the end) ...
             try {
                 when (strategy) {
                     DpiStrategy.SPLIT_1 -> {
-                        delegate.write(b, off, 1) // First byte
+                        delegate.write(b, off, 1)
                         delegate.flush()
-                        Thread.sleep(10)
-                        delegate.write(b, off + 1, len - 1) // Remaining bytes
+                        Thread.sleep(2) // Reduced sleep
+                        delegate.write(b, off + 1, len - 1)
                         delegate.flush()
                     }
                     DpiStrategy.SPLIT_2 -> {
                         delegate.write(b, off, 1)
                         delegate.flush()
-                        Thread.sleep(10)
+                        Thread.sleep(2)
                         if (len > 4) {
                             delegate.write(b, off + 1, 3)
                             delegate.flush()
-                            Thread.sleep(10)
+                            Thread.sleep(2)
                             delegate.write(b, off + 4, len - 4)
                             delegate.flush()
                         } else {
@@ -147,21 +148,57 @@ class DpiOutputStream(
                         delegate.write(b, off, 1)
                         delegate.flush()
                         try {
-                            socket.sendUrgentData(0x00) // OOB packet byte
+                            socket.sendUrgentData(0x00)
                         } catch (ignore: Exception) {} 
-                        Thread.sleep(10)
+                        Thread.sleep(2)
                         delegate.write(b, off + 1, len - 1)
                         delegate.flush()
                     }
                     DpiStrategy.SNI_FRAG -> {
                         var offset = off
                         val end = off + len
+                        // First small chunk
+                        delegate.write(b, offset, 1)
+                        delegate.flush()
+                        Thread.sleep(2)
+                        offset += 1
+                        
+                        // Remaining data in bigger chunks to avoid excessive overhead
                         while (offset < end) {
-                            val chunkLen = if (end - offset > 10) 10 else end - offset
+                            val chunkLen = if (end - offset > 100) 100 else end - offset
                             delegate.write(b, offset, chunkLen)
                             delegate.flush()
-                            Thread.sleep(5)
                             offset += chunkLen
+                        }
+                    }
+                    DpiStrategy.PRO_MIX_1 -> {
+                        // Mix of Split and OOB for stability
+                        delegate.write(b, off, 1)
+                        delegate.flush()
+                        try { socket.sendUrgentData(0x00) } catch (e: Exception) {}
+                        Thread.sleep(2)
+                        delegate.write(b, off + 1, 3)
+                        delegate.flush()
+                        Thread.sleep(2)
+                        delegate.write(b, off + 4, len - 4)
+                        delegate.flush()
+                    }
+                    DpiStrategy.PRO_MIX_2 -> {
+                        // Aggressive fragmentation
+                        var offset = off
+                        val end = off + len
+                        val smallChunks = 4
+                        for (i in 0 until smallChunks) {
+                            if (offset < end) {
+                                delegate.write(b, offset, 1)
+                                delegate.flush()
+                                Thread.sleep(1)
+                                offset++
+                            }
+                        }
+                        if (offset < end) {
+                            delegate.write(b, offset, end - offset)
+                            delegate.flush()
                         }
                     }
                     else -> {
@@ -169,10 +206,10 @@ class DpiOutputStream(
                     }
                 }
             } catch (e: Exception) {
-                delegate.write(b, off, len) // Fallback just in case
+                delegate.write(b, off, len)
             }
         } else {
-            // Если это не TLS Handshake (возможно, просто HTTP трафик или что-то другое)
+            // Если это не TLS Handshake или мы его уже прошли (что проверяется в начале функции)
             delegate.write(b, off, len)
         }
     }

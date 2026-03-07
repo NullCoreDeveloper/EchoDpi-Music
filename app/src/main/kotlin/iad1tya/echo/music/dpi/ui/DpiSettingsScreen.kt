@@ -179,10 +179,12 @@ fun DpiSettingsScreen(
                         label = { Text("RAW параметры (для экспертов)") },
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("Например: -s1 -d1 -f") },
-                        singleLine = true
                     )
                 }
             }
+
+            // Добавляем отступ снизу, чтобы можно было доскроллить до самого низа
+            Spacer(modifier = Modifier.height(120.dp))
         }
     }
 }

@@ -122,6 +122,9 @@ fun NavGraphBuilder.navigationBuilder(
     composable("spotify_import") {
         SpotifyImportScreen(navController)
     }
+    composable("yandex_import") {
+        YandexImportScreen(navController)
+    }
     composable("mood_and_genres") {
         MoodAndGenresScreen(navController, scrollBehavior)
     }

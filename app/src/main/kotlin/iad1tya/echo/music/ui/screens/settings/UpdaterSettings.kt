@@ -101,7 +101,8 @@ fun UpdaterScreen(
                 
                 withContext(Dispatchers.Main) {
                     isChecking = false
-                    if (latestVersion != BuildConfig.VERSION_NAME) {
+                    val currentVersion = BuildConfig.VERSION_NAME.removePrefix("v")
+                    if (latestVersion != currentVersion) {
                         // Show notification
                         showUpdateNotification(context, latestVersion)
                         Toast.makeText(context, "New version $latestVersion available!", Toast.LENGTH_LONG).show()
