@@ -463,9 +463,26 @@ class MainActivity : ComponentActivity() {
                                 val version = tagName.removePrefix("v")
                                 withContext(Dispatchers.Main) {
                                     latestVersionName = version
-                                    // Show notification if new version is available
-                                    val currentVersion = BuildConfig.VERSION_NAME.removePrefix("v")
-                                    if (version != currentVersion) {
+                                    val currentVersion = BuildConfig.VERSION_NAME
+                                    
+                                    // Robust comparison
+                                    fun parse(v: String) = v.removePrefix("v").split(".").map { it.toIntOrNull() ?: 0 }
+                                    val v1 = parse(version)
+                                    val v2 = parse(currentVersion)
+                                    
+                                    var isNewer = false
+                                    for (i in 0 until maxOf(v1.size, v2.size)) {
+                                        val p1 = v1.getOrElse(i) { 0 }
+                                        val p2 = v2.getOrElse(i) { 0 }
+                                        if (p1 > p2) {
+                                            isNewer = true
+                                            break
+                                        } else if (p1 < p2) {
+                                            break
+                                        }
+                                    }
+                                    
+                                    if (isNewer) {
                                         showUpdateNotification(this@MainActivity, version)
                                     }
                                 }

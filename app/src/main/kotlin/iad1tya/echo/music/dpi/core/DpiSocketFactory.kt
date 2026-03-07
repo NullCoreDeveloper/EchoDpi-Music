@@ -116,41 +116,56 @@ class DpiOutputStream(
             return
         }
         
-        // Перехватываем только первые данные в сокете. Если это начало пакета TLS (0x16 0x03):
+        // Перехватываем только первые данные в сокете (TLS Client Hello)
         if (len > 5 && b[off] == 0x16.toByte() && b[off + 1] == 0x03.toByte()) {
             isFirstPacket = false
-            // ... (rest of the logic stays the same but isFirstPacket is now false at the end) ...
             try {
-                // Проверяем все стратегии PRO как единую логику агрессивной фрагментации
-                // так как они отличаются параметрами для CLI, но здесь мы делаем универсальный обход.
+                val fullParams = if (params.isNotBlank()) params else strategy.params
                 
-                // Агрессивная нарезка начала пакета (напр. первые 5 байт по 1 байту)
-                val initialBytesToFragment = 5
-                var bytesFragmented = 0
+                // Простейший парсер параметров -s (split) и -o (oob/urgent)
+                val splitSize = Regex("-s(\\d+)").find(fullParams)?.groupValues?.get(1)?.toIntOrNull() ?: 2
+                val useOob = fullParams.contains("-o1") || fullParams.contains("-o2")
+                val delayMs = Regex("-d(\\d+)").find(fullParams)?.groupValues?.get(1)?.toLongOrNull() ?: 1L
+
+                var bytesWritten = 0
                 
-                while (bytesFragmented < initialBytesToFragment && bytesFragmented < len) {
-                    delegate.write(b, off + bytesFragmented, 1)
-                    delegate.flush()
-                    // Очень маленькая задержка для ТСПУ
-                    Thread.sleep(1)
-                    bytesFragmented++
+                // Нарезаем пакет на куски согласно параметру -s
+                while (bytesWritten < len) {
+                    val remaining = len - bytesWritten
+                    val size = if (remaining > splitSize) splitSize else remaining
+                    
+                    if (useOob && bytesWritten == 0) {
+                        // OOB Inject для первого байта
+                        delegate.write(b, off, 1)
+                        delegate.flush()
+                        try { socket.sendUrgentData(0xFF) } catch (e: Exception) {}
+                        if (size > 1) {
+                            delegate.write(b, off + 1, size - 1)
+                            delegate.flush()
+                        }
+                    } else {
+                        delegate.write(b, off + bytesWritten, size)
+                        delegate.flush()
+                    }
+                    
+                    bytesWritten += size
+                    
+                    if (bytesWritten < len) {
+                        Thread.sleep(delayMs)
+                    }
+                    
+                    // Агрессивная нарезка только для начала пакета (первые 100 байт)
+                    // Остальное пишем одним куском для скорости
+                    if (bytesWritten > 100) {
+                        delegate.write(b, off + bytesWritten, len - bytesWritten)
+                        break
+                    }
                 }
-                
-                // Оставшаяся часть пакета
-                if (bytesFragmented < len) {
-                    delegate.write(b, off + bytesFragmented, len - bytesFragmented)
-                    delegate.flush()
-                }
-                
-                // КРИТИЧНО: Сразу сбрасываем флаг, чтобы следующие пакеты шли без задержек вообще
-                isFirstPacket = false
+                delegate.flush()
             } catch (e: Exception) {
-                // Если что-то пошло не так, пишем как есть
                 delegate.write(b, off, len)
-                isFirstPacket = false
             }
         } else {
-            // Весь последующий трафик (после Handshake) идет напрямую на максимальной скорости
             delegate.write(b, off, len)
         }
     }

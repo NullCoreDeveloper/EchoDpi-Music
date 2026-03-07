@@ -204,8 +204,17 @@
 -keep class okhttp3.** { *; }
 -keep interface okhttp3.** { *; }
 -keep class okhttp3.internal.** { *; }
+-keep class okhttp3.internal.Util { *; }
+-keep class okhttp3.JavaNetCookieJar { *; }
 -dontwarn okhttp3.**
 -dontwarn okio.**
+-keep class okio.** { *; }
+-keep interface okio.** { *; }
+
+# Retrofit
+-keep class retrofit2.** { *; }
+-keep interface retrofit2.** { *; }
+-dontwarn retrofit2.**
 
 ## Keep App Classes
 -keep class iad1tya.echo.music.** { *; }

@@ -36,8 +36,8 @@ class DpiAutoProber {
             
             val client = OkHttpClient.Builder()
                 .socketFactory(customSocketFactory)
-                .connectTimeout(1200, TimeUnit.MILLISECONDS)
-                .readTimeout(1200, TimeUnit.MILLISECONDS)
+                .connectTimeout(2000, TimeUnit.MILLISECONDS)
+                .readTimeout(2000, TimeUnit.MILLISECONDS)
                 .build()
 
             val request = Request.Builder()
