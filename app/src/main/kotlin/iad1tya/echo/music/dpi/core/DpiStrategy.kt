@@ -1,6 +1,7 @@
 package iad1tya.echo.music.dpi.core
 
 enum class DpiStrategy(val title: String, val params: String) {
+    DEFAULT("Стандарт (Без обхода)", ""),
     PRO_1("Pro 1: Mixed Split", "-d1-d3+s -sb+s -d9+s -s12+s -d15+s -s20+s -d25+s -s30+s -d35+s -r1+s -S -al -As -d1-d3+s -se+s -d9+s -s12+s -d15+s -s20+s -d25+s -s30+s -d35+s -S -al"),
     PRO_2("Pro 2: Aggressive Fragment", "-o2 -S2 -s3+S -r3 -S4 -r4 -S5+S -r5+s -s6 -S7+s -r8 -s9+s -Qr -Mh,d,r -a1 -At,r -s2+s -r2 -d2 -s3 -r3 -r4 -s4 -d5+s -r5 -d6 -s7+s -d7 -al"),
     PRO_3("Pro 3: Balanced Split", "-o1-d1-al -At,r,s -s1-d1-s5+s -s10+s -s15+s -s20+s -r1+s -S -al-As -s1-d1-s5+s -s10+s -s15+s -s20+s -S -al"),

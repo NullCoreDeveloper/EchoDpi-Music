@@ -143,11 +143,11 @@ class DpiOutputStream(
                 }
                 
                 // КРИТИЧНО: Сразу сбрасываем флаг, чтобы следующие пакеты шли без задержек вообще
-                isHandshakeDone = true
+                isFirstPacket = false
             } catch (e: Exception) {
                 // Если что-то пошло не так, пишем как есть
                 delegate.write(b, off, len)
-                isHandshakeDone = true
+                isFirstPacket = false
             }
         } else {
             // Весь последующий трафик (после Handshake) идет напрямую на максимальной скорости
