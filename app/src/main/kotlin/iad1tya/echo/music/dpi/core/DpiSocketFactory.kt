@@ -123,9 +123,9 @@ class DpiOutputStream(
                 val fullParams = if (params.isNotBlank()) params else strategy.params
                 
                 // Простейший парсер параметров -s (split) и -o (oob/urgent)
-                val splitSize = Regex("-s(\\d+)").find(fullParams)?.groupValues?.get(1)?.toIntOrNull() ?: 2
+                val splitSize = Regex("-s(\\d+)").find(fullParams)?.groupValues?.get(1)?.toIntOrNull() ?: 64
                 val useOob = fullParams.contains("-o1") || fullParams.contains("-o2")
-                val delayMs = Regex("-d(\\d+)").find(fullParams)?.groupValues?.get(1)?.toLongOrNull() ?: 1L
+                val delayMs = Regex("-d(\\d+)").find(fullParams)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
 
                 var bytesWritten = 0
                 
@@ -150,7 +150,7 @@ class DpiOutputStream(
                     
                     bytesWritten += size
                     
-                    if (bytesWritten < len) {
+                    if (bytesWritten < len && delayMs > 0) {
                         Thread.sleep(delayMs)
                     }
                 }

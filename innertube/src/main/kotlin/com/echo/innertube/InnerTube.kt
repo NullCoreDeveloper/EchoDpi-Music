@@ -399,7 +399,7 @@ class InnerTube {
                 }
             )
         )
-    }
+    }.body<EditPlaylistResponse>()
 
     suspend fun addPlaylistToPlaylist(
         client: YouTubeClient,
