@@ -288,26 +288,26 @@ object YTPlayerUtils {
                 // would be false — causing validateStatus() to run, which fails because private
                 // CDN stream URLs don't respond to unauthenticated HEAD requests, and the loop
                 // then continues past the valid TVHTML5 stream to eventual WEB_CREATOR failure.
-                val isPrivatelyOwned = streamPlayerResponse?.videoDetails?.musicVideoType ==
-                    "MUSIC_VIDEO_TYPE_PRIVATELY_OWNED_TRACK" || isUploadedTrack || isPrivateTrack
-
-                if (clientIndex == STREAM_FALLBACK_CLIENTS.size - 1 || isPrivatelyOwned) {
+                if (clientIndex == -1 || clientIndex == STREAM_FALLBACK_CLIENTS.size - 1 || isPrivatelyOwned) {
                     if (isPrivatelyOwned) {
-                        Timber.tag(logTag).d("Skipping validation for privately owned/uploaded track (client: ${if (clientIndex == -1) MAIN_CLIENT.clientName else STREAM_FALLBACK_CLIENTS[clientIndex].clientName})")
+                        Timber.tag(logTag).d("Skipping validation for privately owned/uploaded track")
+                    } else if (clientIndex == -1) {
+                        Timber.tag(logTag).d("Using MAIN_CLIENT without extra validation for speed")
                     } else {
-                        Timber.tag(logTag).d("Using last fallback client without validation: ${STREAM_FALLBACK_CLIENTS[clientIndex].clientName}")
+                        Timber.tag(logTag).d("Using last fallback client without validation")
                     }
                     break
                 }
 
+                // Only validate for fallback clients that are not the last one
                 if (validateStatus(streamUrl)) {
-                    Timber.tag(logTag).d("Stream validated successfully with client: ${if (clientIndex == -1) MAIN_CLIENT.clientName else STREAM_FALLBACK_CLIENTS[clientIndex].clientName}")
+                    Timber.tag(logTag).d("Stream validated successfully")
                     break
                 } else {
-                    Timber.tag(logTag).d("Stream validation failed for client: ${if (clientIndex == -1) MAIN_CLIENT.clientName else STREAM_FALLBACK_CLIENTS[clientIndex].clientName}")
+                    Timber.tag(logTag).d("Stream validation failed, trying next client")
                 }
             } else {
-                Timber.tag(logTag).d("Player response status not OK: ${streamPlayerResponse?.playabilityStatus?.status}, reason: ${streamPlayerResponse?.playabilityStatus?.reason}")
+                Timber.tag(logTag).d("Player response status not OK: ${streamPlayerResponse?.playabilityStatus?.status}")
             }
         }
 
@@ -400,26 +400,19 @@ object YTPlayerUtils {
      * Adds authentication cookie for privately owned/uploaded tracks.
      */
     private fun validateStatus(url: String): Boolean {
-        Timber.tag(logTag).d("Validating stream URL status")
-        try {
+        return try {
+            val client = httpClient.newBuilder()
+                .connectTimeout(2, java.util.concurrent.TimeUnit.SECONDS)
+                .readTimeout(2, java.util.concurrent.TimeUnit.SECONDS)
+                .build()
             val requestBuilder = okhttp3.Request.Builder()
                 .head()
                 .url(url)
-
-            // Add authentication cookie for privately owned tracks
-            YouTube.cookie?.let { cookie ->
-                requestBuilder.addHeader("Cookie", cookie)
-            }
-
-            val response = httpClient.newCall(requestBuilder.build()).execute()
-            val isSuccessful = response.isSuccessful
-            Timber.tag(logTag).d("Stream URL validation result: ${if (isSuccessful) "Success" else "Failed"} (${response.code})")
-            return isSuccessful
+            YouTube.cookie?.let { requestBuilder.addHeader("Cookie", it) }
+            client.newCall(requestBuilder.build()).execute().use { it.isSuccessful }
         } catch (e: Exception) {
-            Timber.tag(logTag).e(e, "Stream URL validation failed with exception")
-            reportException(e)
+            false
         }
-        return false
     }
     /**
      * Wrapper around the [NewPipeUtils.getSignatureTimestamp] function which reports exceptions
