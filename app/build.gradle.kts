@@ -103,6 +103,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            firebaseCrashlytics {
+                mappingFileUploadEnabled = false
+            }
         }
         debug {
             applicationIdSuffix = ".debug"
