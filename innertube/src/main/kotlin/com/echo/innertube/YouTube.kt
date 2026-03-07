@@ -951,7 +951,7 @@ object YouTube {
         return ""
     }
 
-    suspend fun addToPlaylist(playlistId: String, videoId: String) = runCatching {
+    suspend fun addToPlaylist(playlistId: String, videoId: String): Result<EditPlaylistResponse> = runCatching {
         innerTube.addToPlaylist(WEB_REMIX, playlistId, videoId)
     }
 
@@ -959,15 +959,15 @@ object YouTube {
         innerTube.addVideosToPlaylist(WEB_REMIX, playlistId, videoIds)
     }
 
-    suspend fun addPlaylistToPlaylist(playlistId: String, addPlaylistId: String) = runCatching {
+    suspend fun addPlaylistToPlaylist(playlistId: String, addPlaylistId: String): Result<EditPlaylistResponse> = runCatching {
         innerTube.addPlaylistToPlaylist(WEB_REMIX, playlistId, addPlaylistId)
     }
 
-    suspend fun removeFromPlaylist(playlistId: String, videoId: String, setVideoId: String) = runCatching {
+    suspend fun removeFromPlaylist(playlistId: String, videoId: String, setVideoId: String): Result<EditPlaylistResponse> = runCatching {
         innerTube.removeFromPlaylist(WEB_REMIX, playlistId, videoId, setVideoId)
     }
 
-    suspend fun moveSongPlaylist(playlistId: String, setVideoId: String, successorSetVideoId: String?) = runCatching {
+    suspend fun moveSongPlaylist(playlistId: String, setVideoId: String, successorSetVideoId: String?): Result<EditPlaylistResponse> = runCatching {
         innerTube.moveSongPlaylist(WEB_REMIX, playlistId, setVideoId, successorSetVideoId)
     }
 
