@@ -233,9 +233,9 @@ class App : Application(), SingletonImageLoader.Factory {
 
         return ImageLoader.Builder(this).apply {
             components {
-                add(OkHttpNetworkFetcherFactory {
-                    okhttp3.OkHttpClient.Builder().applyDpi().build()
-                })
+                add(OkHttpNetworkFetcherFactory(
+                    callFactory = { okhttp3.OkHttpClient.Builder().applyDpi().build() }
+                ))
             }
             crossfade(false)
             allowHardware(Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
