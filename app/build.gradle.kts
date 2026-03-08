@@ -96,7 +96,12 @@ android {
             isShrinkResources = true
             isCrunchPngs = false
             isDebuggable = false
-            signingConfig = signingConfigs.getByName("release")
+            
+            val releaseConfigs = signingConfigs.getByName("release")
+            if (releaseConfigs.storeFile?.exists() == true) {
+                signingConfig = releaseConfigs
+            }
+            
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
