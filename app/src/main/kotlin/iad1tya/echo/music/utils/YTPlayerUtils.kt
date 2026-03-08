@@ -152,9 +152,16 @@ object YTPlayerUtils {
             var mainPlayerResponseResult = YouTube.player(currentVideoId, apiPlaylistId, MAIN_CLIENT, signatureTimestamp, null)
             var mainPlayerResponse = mainPlayerResponseResult.getOrNull()
 
+            // Per-song source preference: 0=AUTO, 1=YTM, 2=YT
+            val songPlaybackSource = databaseDao?.getSongById(currentVideoId)?.song?.playbackSource ?: 0
+            
             // Handle fallbacks: either error (geo-restriction/unavailability) OR experimental "all songs" fallback
             val isErrorFallback = enableFallback && (mainPlayerResponse == null || mainPlayerResponse.playabilityStatus.status != "OK")
-            val isForceRequestedFallback = forceAllFallback && !isUploadedTrack && (mainPlayerResponse?.playabilityStatus?.status == "OK")
+            
+            // Should we force YouTube fallback? Either global setting OR per-song preference
+            // But respect YTM preference if explicitly set (1)
+            val isForceYoutubeRequested = (forceAllFallback || songPlaybackSource == 2) && songPlaybackSource != 1
+            val isForceRequestedFallback = isForceYoutubeRequested && !isUploadedTrack && (mainPlayerResponse?.playabilityStatus?.status == "OK")
 
             if (isErrorFallback || isForceRequestedFallback) {
                 if (isForceRequestedFallback) {

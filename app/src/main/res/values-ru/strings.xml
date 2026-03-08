@@ -324,6 +324,10 @@
     <string name="youtube_video_fallback_desc">Использовать видео с YouTube, если песня недоступна</string>
     <string name="youtube_all_fallback">YouTube All Fallback (Экспериментально)</string>
     <string name="youtube_all_fallback_desc">Всегда заменять аудио на видео с YouTube, сохраняя метаданные YouTube Music</string>
+    <string name="playback_source">Источник аудио</string>
+    <string name="playback_source_auto">Авто (по умолчанию)</string>
+    <string name="playback_source_ytm">YouTube Music</string>
+    <string name="playback_source_yt">YouTube</string>
     <string name="vpn_bypass_title">Отключать при VPN</string>
     <string name="vpn_bypass_desc">Автоматически отключать анти-замедление, если включен VPN</string>
 </resources>

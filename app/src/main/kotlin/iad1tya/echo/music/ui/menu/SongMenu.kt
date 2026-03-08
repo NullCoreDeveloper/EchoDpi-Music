@@ -264,6 +264,59 @@ fun SongMenu(
         mutableStateOf(false)
     }
 
+    var showSourceSelectionDialog by rememberSaveable {
+        mutableStateOf(false)
+    }
+
+    if (showSourceSelectionDialog) {
+        ListDialog(
+            onDismiss = { showSourceSelectionDialog = false },
+        ) {
+            item {
+                Text(
+                    text = stringResource(R.string.playback_source),
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.Bold
+                    ),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 16.dp)
+                )
+            }
+            val sources = listOf(0, 1, 2)
+            items(sources) { source ->
+                val label = when (source) {
+                    1 -> R.string.playback_source_ytm
+                    2 -> R.string.playback_source_yt
+                    else -> R.string.playback_source_auto
+                }
+                val icon = when (source) {
+                    1 -> R.drawable.album
+                    2 -> R.drawable.play
+                    else -> R.drawable.settings
+                }
+                
+                ListItem(
+                    headlineContent = { Text(text = stringResource(label)) },
+                    leadingContent = { 
+                        Icon(
+                            painter = painterResource(icon),
+                            contentDescription = null,
+                            tint = if (song.song.playbackSource == source) MaterialTheme.colorScheme.primary else LocalContentColor.current
+                        ) 
+                    },
+                    modifier = Modifier.clickable {
+                        coroutineScope.launch {
+                            database.query {
+                                updatePlaybackSource(song.id, source)
+                            }
+                            showSourceSelectionDialog = false
+                            onDismiss()
+                        }
+                    }
+                )
+            }
+        }
+    }
+
     if (showRingtoneTrimDialog) {
         RingtoneTrimDialog(
             songId        = song.id,
@@ -453,6 +506,18 @@ fun SongMenu(
                             },
                             text = "Set ringtone",
                             onClick = { showRingtoneTrimDialog = true }
+                        ),
+                        NewAction(
+                            icon = {
+                                Icon(
+                                    painter = painterResource(R.drawable.play),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(28.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            },
+                            text = stringResource(R.string.playback_source),
+                            onClick = { showSourceSelectionDialog = true }
                         )
                     ),
                     modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp)

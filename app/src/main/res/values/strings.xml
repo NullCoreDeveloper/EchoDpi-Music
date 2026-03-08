@@ -415,7 +415,11 @@
     <string name="youtube_video_fallback">YouTube Video Fallback</string>
     <string name="youtube_video_fallback_desc">Fallback to YouTube video when track is unavailable</string>
     <string name="youtube_all_fallback">YouTube All Fallback (Experimental)</string>
-    <string name="youtube_all_fallback_desc">Always use regular YouTube videos for audio while keeping YouTube Music metadata</string>
+    <string name="youtube_all_fallback_desc">Always use regular YouTube video as audio source (experimental)</string>
+    <string name="playback_source">Playback Source</string>
+    <string name="playback_source_auto">Auto (Default)</string>
+    <string name="playback_source_ytm">YouTube Music</string>
+    <string name="playback_source_yt">YouTube</string>
     <string name="vpn_bypass_title">Bypass on VPN</string>
     <string name="vpn_bypass_desc">Automatically disable anti-DPI when VPN is connected</string>
 </resources>
