@@ -253,6 +253,12 @@ class MusicService :
         true
     )
 
+    private val youtubeAllFallbackEnabled by preference(
+        this,
+        iad1tya.echo.music.constants.YoutubeAllFallbackKey,
+        false
+    )
+
     private var currentQueue: Queue = EmptyQueue
     var queueTitle: String? = null
 
@@ -2100,6 +2106,7 @@ class MusicService :
                     audioQuality = audioQuality,
                     connectivityManager = connectivityManager,
                     enableFallback = youtubeVideoFallbackEnabled,
+                    forceAllFallback = youtubeAllFallbackEnabled,
                     databaseDao = database,
                 )
             }.getOrElse { throwable ->
@@ -2565,6 +2572,7 @@ class MusicService :
                 audioQuality = audioQuality,
                 connectivityManager = connectivityManager,
                 enableFallback = youtubeVideoFallbackEnabled,
+                forceAllFallback = youtubeAllFallbackEnabled,
                 databaseDao = database,
             ).getOrNull()
             

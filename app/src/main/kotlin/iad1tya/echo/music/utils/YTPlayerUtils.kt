@@ -91,6 +91,7 @@ object YTPlayerUtils {
         audioQuality: AudioQuality,
         connectivityManager: ConnectivityManager,
         enableFallback: Boolean = true,
+        forceAllFallback: Boolean = false,
         databaseDao: DatabaseDao? = null,
     ): Result<PlaybackData> = runCatching {
         coroutineScope {
@@ -151,11 +152,18 @@ object YTPlayerUtils {
             var mainPlayerResponseResult = YouTube.player(currentVideoId, apiPlaylistId, MAIN_CLIENT, signatureTimestamp, null)
             var mainPlayerResponse = mainPlayerResponseResult.getOrNull()
 
-            // Handle geo-restriction / unavailability fallback
-            if (enableFallback && (mainPlayerResponse == null || mainPlayerResponse.playabilityStatus.status != "OK")) {
-                val status = mainPlayerResponse?.playabilityStatus?.status
-                val reason = mainPlayerResponse?.playabilityStatus?.reason
-                Timber.tag(logTag).d("Track $currentVideoId failed with status $status ($reason). Attempting fallback search.")
+            // Handle fallbacks: either error (geo-restriction/unavailability) OR experimental "all songs" fallback
+            val isErrorFallback = enableFallback && (mainPlayerResponse == null || mainPlayerResponse.playabilityStatus.status != "OK")
+            val isForceRequestedFallback = forceAllFallback && !isUploadedTrack && (mainPlayerResponse?.playabilityStatus?.status == "OK")
+
+            if (isErrorFallback || isForceRequestedFallback) {
+                if (isForceRequestedFallback) {
+                    Timber.tag(logTag).d("YouTube All Fallback (experimental) requested for $currentVideoId. Attempting fallback search.")
+                } else {
+                    val status = mainPlayerResponse?.playabilityStatus?.status
+                    val reason = mainPlayerResponse?.playabilityStatus?.reason
+                    Timber.tag(logTag).d("Track $currentVideoId failed with status $status ($reason). Attempting fallback search.")
+                }
 
                 val searchTitle = mainPlayerResponse?.videoDetails?.title
                 val searchAuthor = mainPlayerResponse?.videoDetails?.author
@@ -167,10 +175,12 @@ object YTPlayerUtils {
 
                 val fallbackVideoId = searchVideoId(searchQuery)
                 if (fallbackVideoId != null && fallbackVideoId != currentVideoId) {
-                    Timber.tag(logTag).d("Found fallback videoId: $fallbackVideoId for query: $searchQuery. Retrying with videoId.")
+                    Timber.tag(logTag).d("Found fallback videoId: $fallbackVideoId for query: $searchQuery. Retrying playback.")
                     
-                    // Save to database for future "silent" fallback
-                    databaseDao?.upsert(SetVideoIdEntity(videoId, fallbackVideoId))
+                    // Save to database for future "silent" fallback (only for error-based fallback)
+                    if (isErrorFallback) {
+                        databaseDao?.upsert(SetVideoIdEntity(videoId, fallbackVideoId))
+                    }
 
                     return@coroutineScope playerResponseForPlayback(
                         videoId = fallbackVideoId,
@@ -178,6 +188,7 @@ object YTPlayerUtils {
                         audioQuality = audioQuality,
                         connectivityManager = connectivityManager,
                         enableFallback = false,
+                        forceAllFallback = false,
                         databaseDao = databaseDao
                     ).map { playbackData ->
                         playbackData.copy(
@@ -185,10 +196,14 @@ object YTPlayerUtils {
                         )
                     }.getOrThrow()
                 } else {
-                    Timber.tag(logTag).e("No fallback video found for $videoId")
-                    // If we can't find a fallback, we must throw the original error if it's a real failure
-                    if (mainPlayerResponse == null) {
-                        mainPlayerResponseResult.getOrThrow()
+                    if (isErrorFallback) {
+                        Timber.tag(logTag).e("No fallback video found for $videoId")
+                        // If we can't find a fallback, we must throw the original error if it's a real failure
+                        if (mainPlayerResponse == null) {
+                            mainPlayerResponseResult.getOrThrow()
+                        }
+                    } else {
+                        Timber.tag(logTag).d("No better fallback found for $videoId, using the original.")
                     }
                 }
             }
