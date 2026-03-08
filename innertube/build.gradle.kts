@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.wire)
     kotlin("jvm")
 }
 
@@ -10,6 +11,15 @@ kotlin {
 sourceSets {
     main {
         java.srcDirs("external/java-extractor", "external/java-timeago")
+    }
+}
+
+wire {
+    sourcePath {
+        srcDir("src/main/proto")
+    }
+    java {
+        out = "src/main/java"
     }
 }
 
@@ -34,6 +44,7 @@ dependencies {
     implementation(libs.cache2k.core)
     implementation(libs.rhino)
     implementation("commons-codec:commons-codec:1.16.0")
+    implementation(libs.wire.runtime)
 
     testImplementation(libs.junit)
 }
