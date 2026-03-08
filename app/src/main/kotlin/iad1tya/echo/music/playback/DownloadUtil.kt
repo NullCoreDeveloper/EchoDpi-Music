@@ -46,6 +46,7 @@ constructor(
     private val connectivityManager = context.getSystemService<ConnectivityManager>()!!
     private val audioQuality by enumPreference(context, AudioQualityKey, AudioQuality.AUTO)
     private val youtubeVideoFallbackEnabled by preference(context, iad1tya.echo.music.constants.YoutubeVideoFallbackKey, true)
+    private val youtubeAllFallbackEnabled by preference(context, iad1tya.echo.music.constants.YoutubeAllFallbackKey, false)
     private val songUrlCache = HashMap<String, Pair<String, Long>>()
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -89,6 +90,7 @@ constructor(
                     audioQuality = audioQuality,
                     connectivityManager = connectivityManager,
                     enableFallback = youtubeVideoFallbackEnabled,
+                    forceAllFallback = youtubeAllFallbackEnabled,
                     databaseDao = database
                 )
             }.getOrThrow()
