@@ -184,6 +184,11 @@ fun PlayerSettings(
         defaultValue = true
     )
 
+    val (youtubeAllFallbackEnabled, onYoutubeAllFallbackEnabledChange) = rememberPreference(
+        iad1tya.echo.music.constants.YoutubeAllFallbackKey,
+        defaultValue = false
+    )
+
     Column(
         Modifier
             .windowInsetsPadding(LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
@@ -375,6 +380,14 @@ fun PlayerSettings(
             icon = { Icon(painterResource(R.drawable.video), null) },
             checked = youtubeVideoFallbackEnabled,
             onCheckedChange = onYoutubeVideoFallbackEnabledChange
+        )
+
+        SwitchPreference(
+            title = { Text(stringResource(R.string.youtube_all_fallback)) },
+            description = stringResource(R.string.youtube_all_fallback_desc),
+            icon = { Icon(painterResource(R.drawable.video), null) },
+            checked = youtubeAllFallbackEnabled,
+            onCheckedChange = onYoutubeAllFallbackEnabledChange
         )
 
         PreferenceGroupTitle(
