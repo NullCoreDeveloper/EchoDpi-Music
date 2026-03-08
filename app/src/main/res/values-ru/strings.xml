@@ -322,6 +322,8 @@
     <string name="enable_anti_dpi_desc">Помогает обходить замедление или блокировку стриминга (DPI / ТСПУ)</string>
     <string name="youtube_video_fallback">YouTube Video Fallback</string>
     <string name="youtube_video_fallback_desc">Использовать видео с YouTube, если песня недоступна</string>
+    <string name="youtube_all_fallback">YouTube All Fallback (Экспериментально)</string>
+    <string name="youtube_all_fallback_desc">Всегда заменять аудио на видео с YouTube, сохраняя метаданные YouTube Music</string>
     <string name="vpn_bypass_title">Отключать при VPN</string>
     <string name="vpn_bypass_desc">Автоматически отключать анти-замедление, если включен VPN</string>
 </resources>
