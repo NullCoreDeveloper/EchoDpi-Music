@@ -291,7 +291,7 @@ fun SongMenu(
                 val icon = when (source) {
                     1 -> R.drawable.album
                     2 -> R.drawable.play
-                    else -> R.drawable.settings
+                    else -> R.drawable.settings_outlined
                 }
                 
                 ListItem(

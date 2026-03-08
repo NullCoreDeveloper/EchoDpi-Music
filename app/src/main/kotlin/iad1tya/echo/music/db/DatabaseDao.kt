@@ -1611,5 +1611,5 @@ interface DatabaseDao {
         raw("PRAGMA wal_checkpoint(FULL)".toSQLiteQuery())
     }
     @Query("UPDATE song SET playbackSource = :source WHERE id = :id")
-    suspend fun updatePlaybackSource(id: String, source: Int)
+    fun updatePlaybackSource(id: String, source: Int)
 }
