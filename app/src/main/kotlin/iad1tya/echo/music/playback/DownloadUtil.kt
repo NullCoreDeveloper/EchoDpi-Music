@@ -112,7 +112,7 @@ constructor(
                 )
 
                 val now = LocalDateTime.now()
-                val existing = getSongByIdBlocking(mediaId)?.song
+                val existing = getSongEntityByIdBlocking(mediaId)
 
                 val updatedSong = if (existing != null) {
                     if (existing.dateDownload == null) {
@@ -127,7 +127,7 @@ constructor(
                         duration = playbackData.videoDetails?.lengthSeconds?.toIntOrNull() ?: 0,
                         thumbnailUrl = playbackData.videoDetails?.thumbnail?.thumbnails?.lastOrNull()?.url,
                         dateDownload = now,
-                        isDownloaded = false
+                        isDownloaded = existing?.isDownloaded ?: false
                     )
                 }
 
@@ -154,7 +154,7 @@ constructor(
             dataSourceFactory,
             Executor(Runnable::run)
         ).apply {
-            maxParallelDownloads = 3
+            maxParallelDownloads = 6
             addListener(
                 object : DownloadManager.Listener {
                     override fun onDownloadChanged(
@@ -175,7 +175,8 @@ constructor(
                                 }
                                 Download.STATE_FAILED,
                                 Download.STATE_STOPPED,
-                                Download.STATE_REMOVING -> {
+                                Download.STATE_REMOVING,
+                                Download.STATE_RESTARTING -> {
                                     database.updateDownloadedInfo(download.request.id, false, null)
                                 }
                                 else -> {

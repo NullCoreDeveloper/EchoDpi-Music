@@ -135,7 +135,7 @@ fun AdvancedPlaylistDownloadDialog(
 
                     if (isDownloading) {
                         LinearProgressIndicator(
-                            progress = { progress },
+                            progress = { if (songsToDownload.isEmpty()) 0f else progress },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(8.dp)
@@ -219,43 +219,52 @@ fun AdvancedPlaylistDownloadDialog(
                         isDownloading = true
                         coroutineScope.launch(Dispatchers.IO) {
                             var successCount = 0
-                            songsToDownload.forEachIndexed { index, song ->
-                                progress = (index.toFloat() / songsToDownload.size.toFloat())
-                                withContext(Dispatchers.Main) {
-                                    progressText = "Fetching ${index + 1}/${songsToDownload.size}: ${song.title}"
-                                }
-
-                                try {
-                                    // Use ANDROID_VR_NO_AUTH to avoid authentication issues when logged in
-                                    val result = YouTube.player(song.id, client = YouTubeClient.ANDROID_VR_NO_AUTH)
-                                    val playerResponse = result.getOrNull()
-                                    val formats = playerResponse?.streamingData?.adaptiveFormats
-
-                                    val url = if (selectedFormat == DownloadType.Audio) {
-                                        formats?.filter { it.mimeType.startsWith("audio/mp4") }
-                                            ?.maxByOrNull { it.bitrate ?: 0 }?.url
-                                    } else {
-                                        formats?.filter { it.mimeType.startsWith("video/mp4") }
-                                            ?.maxByOrNull { it.height ?: 0 }?.url
-                                    }
-
-                                    if (!url.isNullOrEmpty()) {
-                                        val extension = if (selectedFormat == DownloadType.Audio) "m4a" else "mp4"
-                                        val fileName = "${song.title.replace("/", "_")}.$extension"
-                                        
-                                        withContext(Dispatchers.Main) {
-                                            downloadFile(context, url, fileName, downloadLocation)
+                            val total = songsToDownload.size
+                            
+                            // Process in chunks of 5 for speed but to avoid hitting rate limits too hard
+                            songsToDownload.chunked(5).forEachIndexed { chunkIndex, chunk ->
+                                val deferreds = chunk.map { song ->
+                                    async {
+                                        try {
+                                            YouTube.player(song.id, client = YouTubeClient.ANDROID_VR_NO_AUTH).getOrNull()?.let { response ->
+                                                song to response
+                                            }
+                                        } catch (e: Exception) {
+                                            null
                                         }
-                                        successCount++
                                     }
-                                } catch (e: Exception) {
-                                    e.printStackTrace()
+                                }
+                                
+                                val results = deferreds.awaitAll().filterNotNull()
+                                
+                                withContext(Dispatchers.Main) {
+                                    results.forEachIndexed { insideIndex, (song, playerResponse) ->
+                                        val overallIndex = chunkIndex * 5 + insideIndex
+                                        progress = (overallIndex.toFloat() / total.toFloat())
+                                        progressText = "Queuing ${overallIndex + 1}/$total: ${song.title}"
+                                        
+                                        val formats = playerResponse.streamingData?.adaptiveFormats
+                                        val url = if (selectedFormat == DownloadType.Audio) {
+                                            formats?.filter { it.mimeType.startsWith("audio/mp4") }
+                                                ?.maxByOrNull { it.bitrate ?: 0 }?.url
+                                        } else {
+                                            formats?.filter { it.mimeType.startsWith("video/mp4") }
+                                                ?.maxByOrNull { it.height ?: 0 }?.url
+                                        }
+
+                                        if (!url.isNullOrEmpty()) {
+                                            val extension = if (selectedFormat == DownloadType.Audio) "m4a" else "mp4"
+                                            val fileName = "${song.title.replace("/", "_")}.$extension"
+                                            downloadFile(context, url, fileName, downloadLocation)
+                                            successCount++
+                                        }
+                                    }
                                 }
                             }
                             
                             withContext(Dispatchers.Main) {
                                 progress = 1f
-                                progressText = "Done! queued $successCount downloads."
+                                progressText = "Done! Queued $successCount downloads."
                                 Toast.makeText(context, "Queued $successCount downloads", Toast.LENGTH_LONG).show()
                                 onDismiss()
                             }
