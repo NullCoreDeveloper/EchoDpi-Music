@@ -124,7 +124,7 @@ nanohttpd = { module = "org.nanohttpd:nanohttpd", version.ref = "nanohttpd" }
 
 #newpipe-extractor = { module = "com.github.libre-tube:NewPipeExtractor", version = "70abbdb" }
 #newpipe-extractor = { module = "com.github.TeamNewPipe:NewPipeExtractor", version = "dev-SNAPSHOT" }
-extractor = { module = "com.github.mostafaalagamy:MetrolistExtractor", version.ref = "extractor" }
+extractor = { module = "com.github.MetrolistGroup:MetrolistExtractor", version = "v4.7.9" }
 
 kuromoji-ipadic = { module = "com.atilika.kuromoji:kuromoji-ipadic", version.ref = "kuromojiIpadic" }
 
