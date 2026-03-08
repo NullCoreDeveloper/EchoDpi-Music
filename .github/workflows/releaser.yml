@@ -27,8 +27,8 @@ jobs:
     - name: Build and Sign Release APK
       run: |
         if [ -z "${{ secrets.RELEASE_KEYSTORE }}" ]; then
-          echo "::error::RELEASE_KEYSTORE secret is missing! Build will fail (signed versions only)."
-          ./gradlew assembleUniversalRelease
+          echo "::error::RELEASE_KEYSTORE secret is missing! Please add it to GitHub Secrets."
+          exit 1
         else
           # Decode keystore robustly using printf to avoid trailing newlines
           printf "%s" "${{ secrets.RELEASE_KEYSTORE }}" | base64 -d > release.keystore
