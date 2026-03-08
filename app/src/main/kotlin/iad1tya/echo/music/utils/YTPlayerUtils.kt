@@ -135,9 +135,52 @@ object YTPlayerUtils {
                 }
             Timber.tag(logTag).d("Signature timestamp: $signatureTimestamp")
 
-            Timber.tag(logTag).d("Attempting to get player response using MAIN_CLIENT: ${MAIN_CLIENT.clientName}")
-            var mainPlayerResponse =
-                YouTube.player(videoId, apiPlaylistId, MAIN_CLIENT, signatureTimestamp, null).getOrThrow()
+            var mainPlayerResponseResult = YouTube.player(videoId, apiPlaylistId, MAIN_CLIENT, signatureTimestamp, null)
+            var mainPlayerResponse = mainPlayerResponseResult.getOrNull()
+
+            // Handle geo-restriction / unavailability fallback
+            if (mainPlayerResponse == null || mainPlayerResponse.playabilityStatus.status != "OK") {
+                val status = mainPlayerResponse?.playabilityStatus?.status
+                val reason = mainPlayerResponse?.playabilityStatus?.reason
+                Timber.tag(logTag).d("Main client failed with status $status ($reason). Attempting fallback to YouTube video search.")
+
+                val searchTitle = mainPlayerResponse?.videoDetails?.title
+                val searchAuthor = mainPlayerResponse?.videoDetails?.author
+                val searchQuery = if (searchTitle != null && searchAuthor != null) {
+                    "$searchTitle - $searchAuthor"
+                } else {
+                    searchTitle ?: videoId
+                }
+
+                val fallbackVideoId = searchVideoId(searchQuery)
+                if (fallbackVideoId != null && fallbackVideoId != videoId) {
+                    Timber.tag(logTag).d("Found fallback videoId: $fallbackVideoId for query: $searchQuery. Retrying with videoId.")
+                    // Retry playerResponseForPlayback with the new fallback video ID
+                    // We call it recursively but we need to make sure we don't loop infinitely.
+                    // Since we already matched fallbackVideoId != videoId, it's safe for one level.
+                    // But to be even safer, we can just call the core logic again or use a marker.
+                    return@coroutineScope playerResponseForPlayback(
+                        videoId = fallbackVideoId,
+                        playlistId = null, // Don't pass playlistId for fallback video
+                        audioQuality = audioQuality,
+                        connectivityManager = connectivityManager
+                    ).map { playbackData ->
+                        // Preserve original video details from the restricted track if possible
+                        playbackData.copy(
+                            videoDetails = mainPlayerResponse?.videoDetails ?: playbackData.videoDetails
+                        )
+                    }.getOrThrow()
+                } else {
+                    Timber.tag(logTag).e("No fallback video found for $videoId")
+                    // If we can't find a fallback, we must throw the original error if it's a real failure
+                    if (mainPlayerResponse == null) {
+                        mainPlayerResponseResult.getOrThrow()
+                    }
+                }
+            }
+            
+            // Re-assign mainPlayerResponse if it was null but we didn't return (shouldn't happen with getOrThrow)
+            if (mainPlayerResponse == null) mainPlayerResponse = mainPlayerResponseResult.getOrThrow()
 
             val poToken: PoTokenResult? = poTokenDeferred.await()
 
@@ -508,6 +551,15 @@ object YTPlayerUtils {
 
         Timber.tag(logTag).e("All URL resolution methods failed for videoId=$videoId")
         return null
+    }
+
+    /**
+     * Searches for a video matching the query and returns the first videoId.
+     */
+    private suspend fun searchVideoId(query: String): String? {
+        Timber.tag(logTag).d("Searching for fallback video with query: $query")
+        return YouTube.search(query, YouTube.SearchFilter.FILTER_VIDEO).getOrNull()?.items
+            ?.firstOrNull()?.id
     }
 
     /**
