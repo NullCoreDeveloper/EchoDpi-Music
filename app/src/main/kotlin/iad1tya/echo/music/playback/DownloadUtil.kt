@@ -199,6 +199,10 @@ constructor(
 
     fun getDownload(songId: String): Flow<Download?> = downloads.map { it[songId] }
 
+    fun removeFromCache(songId: String) {
+        songUrlCache.remove(songId)
+    }
+
     fun release() {
         scope.cancel()
     }

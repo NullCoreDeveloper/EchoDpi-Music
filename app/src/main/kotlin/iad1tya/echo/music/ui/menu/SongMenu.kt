@@ -303,11 +303,21 @@ fun SongMenu(
                             tint = if (song.song.playbackSource == source) MaterialTheme.colorScheme.primary else LocalContentColor.current
                         ) 
                     },
+                    trailingContent = {
+                        if (song.song.playbackSource == source) {
+                            Icon(
+                                painter = painterResource(R.drawable.done),
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    },
                     modifier = Modifier.clickable {
                         coroutineScope.launch {
                             database.query {
                                 updatePlaybackSource(song.id, source)
                             }
+                            downloadUtil.removeFromCache(song.id)
                             showSourceSelectionDialog = false
                             onDismiss()
                         }

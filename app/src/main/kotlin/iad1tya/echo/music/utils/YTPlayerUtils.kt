@@ -161,7 +161,11 @@ object YTPlayerUtils {
             // Should we force YouTube fallback? Either global setting OR per-song preference
             // But respect YTM preference if explicitly set (1)
             val isForceYoutubeRequested = (forceAllFallback || songPlaybackSource == 2) && songPlaybackSource != 1
-            val isForceRequestedFallback = isForceYoutubeRequested && !isUploadedTrack && (mainPlayerResponse?.playabilityStatus?.status == "OK")
+            
+            // Check if it's an audio-only track (ATV) which might benefit from a video fallback
+            val isAudioTrackOnly = mainPlayerResponse?.videoDetails?.musicVideoType == "MUSIC_VIDEO_TYPE_ATV"
+            
+            val isForceRequestedFallback = isForceYoutubeRequested && !isUploadedTrack && (mainPlayerResponse?.playabilityStatus?.status == "OK") && isAudioTrackOnly
 
             if (isErrorFallback || isForceRequestedFallback) {
                 if (isForceRequestedFallback) {
