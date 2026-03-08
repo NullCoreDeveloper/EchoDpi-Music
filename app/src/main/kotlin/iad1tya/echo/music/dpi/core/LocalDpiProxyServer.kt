@@ -210,7 +210,6 @@ object LocalDpiProxyServer {
                 val read = input.read(buffer)
                 if (read == -1) break
                 output.write(buffer, 0, read)
-                output.flush()
             }
         } catch (e: Exception) {
             // ignore

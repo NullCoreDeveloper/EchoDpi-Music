@@ -299,7 +299,7 @@ fun SongListItem(
             subtitle = joinByBullet(
                 song.artists.joinToString { it.name },
                 makeTimeString(song.song.duration * 1000L),
-                if (song.song.isDownloaded && song.song.playbackSource == 2) "[YT]" else null
+                if (song.song.playbackSource == 2) \"[YT]\" else null
             ),
             badges = badges,
             thumbnailContent = {

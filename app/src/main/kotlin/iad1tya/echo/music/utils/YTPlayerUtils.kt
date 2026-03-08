@@ -162,10 +162,15 @@ object YTPlayerUtils {
             // But respect YTM preference if explicitly set (1)
             val isForceYoutubeRequested = (forceAllFallback || songPlaybackSource == 2) && songPlaybackSource != 1
             
-            // Check if it's an audio-only track (ATV) which might benefit from a video fallback
-            val isAudioTrackOnly = mainPlayerResponse?.videoDetails?.musicVideoType == "MUSIC_VIDEO_TYPE_ATV"
-            
-            val isForceRequestedFallback = isForceYoutubeRequested && !isUploadedTrack && (mainPlayerResponse?.playabilityStatus?.status == "OK") && isAudioTrackOnly
+            // If YouTube source is explicitly requested (songPlaybackSource == 2), we always allow fallback search
+            // even if it's already a video (to find a better/official video if it's currently an ATV/Audio track).
+            // For global 'forceAllFallback', we keep the ATV restriction to avoid unnecessary searches for everything.
+            val isForceRequestedFallback = if (songPlaybackSource == 2) {
+                !isUploadedTrack && (mainPlayerResponse?.playabilityStatus?.status == "OK")
+            } else {
+                forceAllFallback && !isUploadedTrack && (mainPlayerResponse?.playabilityStatus?.status == "OK") && 
+                mainPlayerResponse?.videoDetails?.musicVideoType == "MUSIC_VIDEO_TYPE_ATV"
+            }
 
             if (isErrorFallback || isForceRequestedFallback) {
                 if (isForceRequestedFallback) {

@@ -122,37 +122,43 @@ class DpiOutputStream(
             try {
                 val fullParams = if (params.isNotBlank()) params else strategy.params
                 
-                // Простейший парсер параметров -s (split) и -o (oob/urgent)
+                // Простейший парсер параметров -s (split), -o (oob/urgent) и -d (delay)
                 val splitSize = Regex("-s(\\d+)").find(fullParams)?.groupValues?.get(1)?.toIntOrNull() ?: 64
                 val useOob = fullParams.contains("-o1") || fullParams.contains("-o2")
                 val delayMs = Regex("-d(\\d+)").find(fullParams)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
 
                 var bytesWritten = 0
                 
-                // Нарезаем пакет на куски согласно параметру -s
-                while (bytesWritten < len) {
-                    val remaining = len - bytesWritten
+                // Ограничиваем нарезку только первыми 512 байтами для TLS Client Hello.
+                // Остальное отправляем целиком, чтобы не замедлять передачу данных.
+                val splitLimit = if (len > 512) 512 else len
+
+                while (bytesWritten < splitLimit) {
+                    val remaining = splitLimit - bytesWritten
                     val size = if (remaining > splitSize) splitSize else remaining
                     
                     if (useOob && bytesWritten == 0) {
-                        // OOB Inject для первого байта
                         delegate.write(b, off, 1)
                         delegate.flush()
                         try { socket.sendUrgentData(0xFF) } catch (e: Exception) {}
                         if (size > 1) {
                             delegate.write(b, off + 1, size - 1)
-                            delegate.flush()
                         }
                     } else {
                         delegate.write(b, off + bytesWritten, size)
-                        delegate.flush()
                     }
                     
                     bytesWritten += size
                     
-                    if (bytesWritten < len && delayMs > 0) {
-                        Thread.sleep(delayMs)
+                    if (bytesWritten < splitLimit) {
+                        if (delayMs > 0) Thread.sleep(delayMs)
+                        delegate.flush()
                     }
+                }
+                
+                // Дописываем остаток, если он есть
+                if (bytesWritten < len) {
+                    delegate.write(b, off + bytesWritten, len - bytesWritten)
                 }
                 delegate.flush()
             } catch (e: Exception) {

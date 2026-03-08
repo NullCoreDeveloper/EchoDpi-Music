@@ -157,6 +157,17 @@ constructor(
             maxParallelDownloads = 6
             addListener(
                 object : DownloadManager.Listener {
+                    override fun onDownloadRemoved(downloadManager: DownloadManager, download: Download) {
+                        downloads.update { map ->
+                            map.toMutableMap().apply {
+                                remove(download.request.id)
+                            }
+                        }
+                        scope.launch {
+                            database.updateDownloadedInfo(download.request.id, false, null)
+                        }
+                    }
+
                     override fun onDownloadChanged(
                         downloadManager: DownloadManager,
                         download: Download,
