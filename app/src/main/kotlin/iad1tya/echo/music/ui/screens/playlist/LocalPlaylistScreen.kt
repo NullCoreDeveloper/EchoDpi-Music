@@ -1008,11 +1008,8 @@ fun LocalPlaylistHeader(
                 setHideBottomControls(true)
                 setToolbarTitle(context.getString(R.string.edit_playlist_cover))
                 
-                setStatusBarLight(!darkTheme)
-
                 setToolbarColor(cropColor.surface.toArgb())
                 setToolbarWidgetColor(cropColor.inverseSurface.toArgb())
-                setRootViewBackgroundColor(cropColor.surface.toArgb())
                 setLogoColor(cropColor.surface.toArgb())
             }
 

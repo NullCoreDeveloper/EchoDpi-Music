@@ -47,6 +47,9 @@ import iad1tya.echo.music.R
 import iad1tya.echo.music.models.MediaMetadata
 import iad1tya.echo.music.models.toMediaMetadata
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -222,41 +225,45 @@ fun AdvancedPlaylistDownloadDialog(
                             val total = songsToDownload.size
                             
                             // Process in chunks of 5 for speed but to avoid hitting rate limits too hard
-                            songsToDownload.chunked(5).forEachIndexed { chunkIndex, chunk ->
-                                val deferreds = chunk.map { song ->
-                                    async {
-                                        try {
-                                            YouTube.player(song.id, client = YouTubeClient.ANDROID_VR_NO_AUTH).getOrNull()?.let { response ->
-                                                song to response
+                            coroutineScope {
+                                songsToDownload.chunked(5).forEachIndexed { chunkIndex, chunk ->
+                                    val deferreds = chunk.map { song ->
+                                        async {
+                                            try {
+                                                YouTube.player(song.id, client = YouTubeClient.ANDROID_VR_NO_AUTH).getOrNull()?.let { response ->
+                                                    song to response
+                                                }
+                                            } catch (e: Exception) {
+                                                null
                                             }
-                                        } catch (e: Exception) {
-                                            null
                                         }
                                     }
-                                }
-                                
-                                val results = deferreds.awaitAll().filterNotNull()
-                                
-                                withContext(Dispatchers.Main) {
-                                    results.forEachIndexed { insideIndex, (song, playerResponse) ->
-                                        val overallIndex = chunkIndex * 5 + insideIndex
-                                        progress = (overallIndex.toFloat() / total.toFloat())
-                                        progressText = "Queuing ${overallIndex + 1}/$total: ${song.title}"
-                                        
-                                        val formats = playerResponse.streamingData?.adaptiveFormats
-                                        val url = if (selectedFormat == DownloadType.Audio) {
-                                            formats?.filter { it.mimeType.startsWith("audio/mp4") }
-                                                ?.maxByOrNull { it.bitrate ?: 0 }?.url
-                                        } else {
-                                            formats?.filter { it.mimeType.startsWith("video/mp4") }
-                                                ?.maxByOrNull { it.height ?: 0 }?.url
-                                        }
+                                    
+                                    val results = deferreds.awaitAll().filterNotNull()
+                                    
+                                    withContext(Dispatchers.Main) {
+                                        results.forEachIndexed { insideIndex, pair ->
+                                            val song = pair.first
+                                            val playerResponse = pair.second
+                                            val overallIndex = chunkIndex * 5 + insideIndex
+                                            progress = (overallIndex.toFloat() / total.toFloat())
+                                            progressText = "Queuing ${overallIndex + 1}/$total: ${song.title}"
+                                            
+                                            val formats = playerResponse.streamingData?.adaptiveFormats
+                                            val url = if (selectedFormat == DownloadType.Audio) {
+                                                formats?.filter { it.mimeType.startsWith("audio/mp4") }
+                                                    ?.maxByOrNull { it.bitrate ?: 0 }?.url
+                                            } else {
+                                                formats?.filter { it.mimeType.startsWith("video/mp4") }
+                                                    ?.maxByOrNull { it.height ?: 0 }?.url
+                                            }
 
-                                        if (!url.isNullOrEmpty()) {
-                                            val extension = if (selectedFormat == DownloadType.Audio) "m4a" else "mp4"
-                                            val fileName = "${song.title.replace("/", "_")}.$extension"
-                                            downloadFile(context, url, fileName, downloadLocation)
-                                            successCount++
+                                            if (!url.isNullOrEmpty()) {
+                                                val extension = if (selectedFormat == DownloadType.Audio) "m4a" else "mp4"
+                                                val fileName = "${song.title.replace("/", "_")}.$extension"
+                                                downloadFile(context, url, fileName, downloadLocation)
+                                                successCount++
+                                            }
                                         }
                                     }
                                 }
