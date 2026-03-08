@@ -22,6 +22,8 @@ import iad1tya.echo.music.di.DownloadCache
 import iad1tya.echo.music.di.PlayerCache
 import iad1tya.echo.music.utils.YTPlayerUtils
 import iad1tya.echo.music.utils.enumPreference
+import iad1tya.echo.music.utils.preference
+import iad1tya.echo.music.utils.dataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
@@ -43,7 +45,7 @@ constructor(
 ) {
     private val connectivityManager = context.getSystemService<ConnectivityManager>()!!
     private val audioQuality by enumPreference(context, AudioQualityKey, AudioQuality.AUTO)
-    private val youtubeVideoFallbackEnabled = context.dataStore.get(iad1tya.echo.music.constants.YoutubeVideoFallbackKey, true)
+    private val youtubeVideoFallbackEnabled by preference(context, iad1tya.echo.music.constants.YoutubeVideoFallbackKey, true)
     private val songUrlCache = HashMap<String, Pair<String, Long>>()
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -86,7 +88,7 @@ constructor(
                     mediaId,
                     audioQuality = audioQuality,
                     connectivityManager = connectivityManager,
-                    enableFallback = runBlocking(Dispatchers.IO) { youtubeVideoFallbackEnabled.first() }
+                    enableFallback = youtubeVideoFallbackEnabled
                 )
             }.getOrThrow()
             val format = playbackData.format

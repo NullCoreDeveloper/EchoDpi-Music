@@ -84,18 +84,17 @@ fun DpiSettingsScreen(
                 )
             }
 
-            val autoDisableDpiOnVpn by rememberPreference(DpiConfig.AutoDisableDpiOnVpnKey, defaultValue = false)
+            val (autoDisableDpiOnVpn, onAutoDisableDpiOnVpnChange) = rememberPreference(
+                AutoDisableDpiOnVpnKey,
+                defaultValue = true
+            )
             val context = LocalContext.current
 
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable {
-                        coroutineScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                            iad1tya.echo.music.utils.dataStore(context).edit {
-                                it[iad1tya.echo.music.dpi.core.DpiConfig.AutoDisableDpiOnVpnKey] = !autoDisableDpiOnVpn
-                            }
-                        }
+                        onAutoDisableDpiOnVpnChange(!autoDisableDpiOnVpn)
                     },
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -110,13 +109,7 @@ fun DpiSettingsScreen(
                 }
                 Switch(
                     checked = autoDisableDpiOnVpn,
-                    onCheckedChange = { enabled ->
-                        coroutineScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                            iad1tya.echo.music.utils.dataStore(context).edit {
-                                it[iad1tya.echo.music.dpi.core.DpiConfig.AutoDisableDpiOnVpnKey] = enabled
-                            }
-                        }
-                    }
+                    onCheckedChange = onAutoDisableDpiOnVpnChange
                 )
             }
 

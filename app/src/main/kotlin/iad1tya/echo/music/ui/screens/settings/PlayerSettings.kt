@@ -50,26 +50,7 @@ import androidx.compose.ui.zIndex
 import androidx.navigation.NavController
 import iad1tya.echo.music.LocalPlayerAwareWindowInsets
 import iad1tya.echo.music.R
-import iad1tya.echo.music.constants.CrossfadeEnabledKey
-import iad1tya.echo.music.constants.CrossfadeGaplessKey
-import iad1tya.echo.music.constants.DisableLoadMoreWhenRepeatAllKey
-import iad1tya.echo.music.constants.AutoSkipNextOnErrorKey
-import iad1tya.echo.music.constants.DoubleTapToLikeKey
-import iad1tya.echo.music.constants.KeepScreenOn
-import iad1tya.echo.music.constants.MusicHapticsEnabledKey
-import iad1tya.echo.music.constants.PauseOnMute
-import iad1tya.echo.music.constants.PersistentQueueKey
-import iad1tya.echo.music.constants.PreventDuplicateTracksInQueueKey
-import iad1tya.echo.music.constants.RememberShuffleAndRepeatKey
-import iad1tya.echo.music.constants.ResumeOnBluetoothConnectKey
-import iad1tya.echo.music.constants.SimilarContent
-import iad1tya.echo.music.constants.SkipSilenceKey
-import iad1tya.echo.music.constants.ForceStopOnTaskClearKey
-import iad1tya.echo.music.constants.StopMusicOnTaskClearKey
-import iad1tya.echo.music.constants.TTSAnnouncementEnabledKey
-import iad1tya.echo.music.constants.TapAlbumArtForLyricsKey
-import iad1tya.echo.music.constants.HistoryDuration
-import iad1tya.echo.music.constants.SeekExtraSeconds
+import iad1tya.echo.music.constants.*
 import iad1tya.echo.music.ui.component.EnumListPreference
 import iad1tya.echo.music.ui.component.IconButton
 import iad1tya.echo.music.ui.component.PreferenceGroupTitle
@@ -390,8 +371,8 @@ fun PlayerSettings(
 
         SwitchPreference(
             title = { Text(stringResource(R.string.youtube_video_fallback)) },
-            description = { Text(stringResource(R.string.youtube_video_fallback_desc)) },
-            icon = { Icon(painterResource(R.drawable.youtube), null) },
+            description = stringResource(R.string.youtube_video_fallback_desc),
+            icon = { Icon(painterResource(R.drawable.video), null) },
             checked = youtubeVideoFallbackEnabled,
             onCheckedChange = onYoutubeVideoFallbackEnabledChange
         )

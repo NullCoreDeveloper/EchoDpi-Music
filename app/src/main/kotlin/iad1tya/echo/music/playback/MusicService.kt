@@ -171,6 +171,7 @@ import iad1tya.echo.music.utils.YTPlayerUtils
 import iad1tya.echo.music.utils.dataStore
 import iad1tya.echo.music.utils.enumPreference
 import iad1tya.echo.music.utils.get
+import iad1tya.echo.music.utils.preference
 import iad1tya.echo.music.utils.reportException
 import iad1tya.echo.music.widget.MusicWidgetProvider
 import dagger.hilt.android.AndroidEntryPoint
@@ -246,7 +247,7 @@ class MusicService :
         iad1tya.echo.music.constants.AudioQuality.AUTO
     )
 
-    private val youtubeVideoFallbackEnabled by map(
+    private val youtubeVideoFallbackEnabled by preference(
         this,
         iad1tya.echo.music.constants.YoutubeVideoFallbackKey,
         true
