@@ -26,12 +26,12 @@ jobs:
 
     - name: Build and Sign Release APK
       run: |
-        # Generate a temporary keystore for signing the release APK
-        keytool -genkey -v -keystore release.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "C=US, O=Android, CN=Android Debug"
+        # Decode the keystore from secrets
+        echo "${{ secrets.RELEASE_KEYSTORE }}" | base64 -d > release.keystore
         export KEYSTORE_PATH=$(pwd)/release.keystore
-        export STORE_PASSWORD=android
-        export KEY_ALIAS=androiddebugkey
-        export KEY_PASSWORD=android
+        export STORE_PASSWORD="${{ secrets.RELEASE_STORE_PASSWORD }}"
+        export KEY_ALIAS="${{ secrets.RELEASE_KEY_ALIAS }}"
+        export KEY_PASSWORD="${{ secrets.RELEASE_KEY_PASSWORD }}"
         echo "firebaseCrashlytics.mappingFileUploadEnabled=false" >> gradle.properties
         ./gradlew assembleUniversalRelease
 
