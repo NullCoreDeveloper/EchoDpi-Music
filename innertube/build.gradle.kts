@@ -5,12 +5,12 @@ plugins {
 }
 
 kotlin {
-    jvmToolchain(21)
+    jvmToolchain(17)
 }
 
 sourceSets {
     main {
-        java.srcDirs("external/java-extractor", "external/java-timeago")
+        java.srcDirs("external/java-extractor", "external/java-timeago", "src/main/java")
     }
 }
 
