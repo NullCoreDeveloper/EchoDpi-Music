@@ -246,6 +246,12 @@ class MusicService :
         iad1tya.echo.music.constants.AudioQuality.AUTO
     )
 
+    private val youtubeVideoFallbackEnabled by map(
+        this,
+        iad1tya.echo.music.constants.YoutubeVideoFallbackKey,
+        true
+    )
+
     private var currentQueue: Queue = EmptyQueue
     var queueTitle: String? = null
 
@@ -2092,6 +2098,7 @@ class MusicService :
                     playlistId = if (isUploadedSong) "MLPT" else null,
                     audioQuality = audioQuality,
                     connectivityManager = connectivityManager,
+                    enableFallback = youtubeVideoFallbackEnabled,
                 )
             }.getOrElse { throwable ->
                 when (throwable) {
@@ -2554,7 +2561,8 @@ class MusicService :
                 videoId = mediaId,
                 playlistId = if (isUploadedSong) "MLPT" else null,
                 audioQuality = audioQuality,
-                connectivityManager = connectivityManager
+                connectivityManager = connectivityManager,
+                enableFallback = youtubeVideoFallbackEnabled,
             ).getOrNull()
             
             val streamUrl = playbackData?.streamUrl

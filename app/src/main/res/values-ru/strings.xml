@@ -318,4 +318,10 @@
     <string name="use_login_for_browse">Авторизуйтесь для просмотра контента</string>
     <string name="use_login_for_browse_desc">Это влияет на отображение контента и, в частности, открывает доступ к премиум-альбомам при входе с премиум-учётной записью</string>
     <string name="action_login">Войти</string>
+    <string name="enable_anti_dpi_title">Включить анти-замедление</string>
+    <string name="enable_anti_dpi_desc">Помогает обходить замедление или блокировку стриминга (DPI / ТСПУ)</string>
+    <string name="youtube_video_fallback">YouTube Video Fallback</string>
+    <string name="youtube_video_fallback_desc">Использовать видео с YouTube, если песня недоступна</string>
+    <string name="vpn_bypass_title">Отключать при VPN</string>
+    <string name="vpn_bypass_desc">Автоматически отключать анти-замедление, если включен VPN</string>
 </resources>

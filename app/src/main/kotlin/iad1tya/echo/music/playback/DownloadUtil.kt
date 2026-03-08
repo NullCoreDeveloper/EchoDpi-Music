@@ -43,6 +43,7 @@ constructor(
 ) {
     private val connectivityManager = context.getSystemService<ConnectivityManager>()!!
     private val audioQuality by enumPreference(context, AudioQualityKey, AudioQuality.AUTO)
+    private val youtubeVideoFallbackEnabled = context.dataStore.get(iad1tya.echo.music.constants.YoutubeVideoFallbackKey, true)
     private val songUrlCache = HashMap<String, Pair<String, Long>>()
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -56,7 +57,7 @@ constructor(
                 .setCache(playerCache)
                 .setUpstreamDataSourceFactory(
                     OkHttpDataSource.Factory(
-                        iad1tya.echo.music.dpi.core.DpiConfig.applyTo(OkHttpClient.Builder())
+                        iad1tya.echo.music.dpi.core.DpiConfig.applyTo(OkHttpClient.Builder(), context)
                             .proxy(YouTube.proxy)
                             .proxyAuthenticator { _, response ->
                                 YouTube.proxyAuth?.let { auth ->
@@ -85,6 +86,7 @@ constructor(
                     mediaId,
                     audioQuality = audioQuality,
                     connectivityManager = connectivityManager,
+                    enableFallback = runBlocking(Dispatchers.IO) { youtubeVideoFallbackEnabled.first() }
                 )
             }.getOrThrow()
             val format = playbackData.format

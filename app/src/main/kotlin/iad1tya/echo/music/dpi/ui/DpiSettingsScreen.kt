@@ -11,7 +11,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import iad1tya.echo.music.dpi.core.DpiAutoProber
 import iad1tya.echo.music.dpi.core.DpiStrategy
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
+import iad1tya.echo.music.R
+import iad1tya.echo.music.constants.*
+import iad1tya.echo.music.dpi.core.DpiConfig
+import iad1tya.echo.music.utils.rememberPreference
+import iad1tya.echo.music.utils.dataStore
+import androidx.datastore.preferences.core.edit
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.clickable
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,9 +71,9 @@ fun DpiSettingsScreen(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Включить анти-замедление", style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.enable_anti_dpi_title), style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "Помогает обходить замедление или блокировку стриминга (DPI / ТСПУ)",
+                        stringResource(R.string.enable_anti_dpi_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -71,6 +81,42 @@ fun DpiSettingsScreen(
                 Switch(
                     checked = currentEnabled,
                     onCheckedChange = onEnabledChange
+                )
+            }
+
+            val autoDisableDpiOnVpn by rememberPreference(DpiConfig.AutoDisableDpiOnVpnKey, defaultValue = false)
+            val context = LocalContext.current
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        coroutineScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                            iad1tya.echo.music.utils.dataStore(context).edit {
+                                it[iad1tya.echo.music.dpi.core.DpiConfig.AutoDisableDpiOnVpnKey] = !autoDisableDpiOnVpn
+                            }
+                        }
+                    },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(stringResource(R.string.vpn_bypass_title), style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        stringResource(R.string.vpn_bypass_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = autoDisableDpiOnVpn,
+                    onCheckedChange = { enabled ->
+                        coroutineScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                            iad1tya.echo.music.utils.dataStore(context).edit {
+                                it[iad1tya.echo.music.dpi.core.DpiConfig.AutoDisableDpiOnVpnKey] = enabled
+                            }
+                        }
+                    }
                 )
             }
 

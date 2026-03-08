@@ -50,13 +50,6 @@ import androidx.compose.ui.zIndex
 import androidx.navigation.NavController
 import iad1tya.echo.music.LocalPlayerAwareWindowInsets
 import iad1tya.echo.music.R
-import iad1tya.echo.music.constants.AudioNormalizationKey
-import iad1tya.echo.music.constants.AudioQuality
-import iad1tya.echo.music.constants.AudioQualityKey
-import iad1tya.echo.music.constants.AudioOffload
-import iad1tya.echo.music.constants.AutoDownloadOnLikeKey
-import iad1tya.echo.music.constants.AutoLoadMoreKey
-import iad1tya.echo.music.constants.CrossfadeDurationKey
 import iad1tya.echo.music.constants.CrossfadeEnabledKey
 import iad1tya.echo.music.constants.CrossfadeGaplessKey
 import iad1tya.echo.music.constants.DisableLoadMoreWhenRepeatAllKey
@@ -203,6 +196,11 @@ fun PlayerSettings(
     val (musicHapticsEnabled, onMusicHapticsEnabledChange) = rememberPreference(
         MusicHapticsEnabledKey,
         defaultValue = false
+    )
+
+    val (youtubeVideoFallbackEnabled, onYoutubeVideoFallbackEnabledChange) = rememberPreference(
+        iad1tya.echo.music.constants.YoutubeVideoFallbackKey,
+        defaultValue = true
     )
 
     Column(
@@ -388,6 +386,14 @@ fun PlayerSettings(
             icon = { Icon(painterResource(R.drawable.skip_next), null) },
             checked = autoSkipNextOnError,
             onCheckedChange = onAutoSkipNextOnErrorChange
+        )
+
+        SwitchPreference(
+            title = { Text(stringResource(R.string.youtube_video_fallback)) },
+            description = { Text(stringResource(R.string.youtube_video_fallback_desc)) },
+            icon = { Icon(painterResource(R.drawable.youtube), null) },
+            checked = youtubeVideoFallbackEnabled,
+            onCheckedChange = onYoutubeVideoFallbackEnabledChange
         )
 
         PreferenceGroupTitle(

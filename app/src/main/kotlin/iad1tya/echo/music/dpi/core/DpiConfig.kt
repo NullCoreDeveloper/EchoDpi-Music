@@ -12,13 +12,17 @@ object DpiConfig {
     val DpiEnabledKey = booleanPreferencesKey("dpi_enabled")
     val DpiStrategyKey = stringPreferencesKey("dpi_strategy")
     val DpiCustomParamsKey = stringPreferencesKey("dpi_custom_params")
+    val AutoDisableDpiOnVpnKey = booleanPreferencesKey("auto_disable_dpi_on_vpn")
 
     // In-memory cache for fast synchronous access
     @Volatile var isEnabled = true
+    @Volatile var autoDisableOnVpn = false
     @Volatile var currentStrategy = DpiStrategy.DEFAULT
     @Volatile var customParams = ""
 
-    fun applyTo(builder: okhttp3.OkHttpClient.Builder) = builder.applyDpi()
+    fun applyTo(builder: okhttp3.OkHttpClient.Builder, context: android.content.Context? = null): okhttp3.OkHttpClient.Builder {
+        return builder.applyDpi(context)
+    }
 }
 
 class DpiDns : Dns {
@@ -48,9 +52,11 @@ class DpiDns : Dns {
     }
 }
 
-fun okhttp3.OkHttpClient.Builder.applyDpi(): okhttp3.OkHttpClient.Builder {
+fun okhttp3.OkHttpClient.Builder.applyDpi(context: android.content.Context? = null): okhttp3.OkHttpClient.Builder {
     try {
-        if (DpiConfig.isEnabled && (DpiConfig.currentStrategy != DpiStrategy.DEFAULT || DpiConfig.customParams.isNotBlank())) {
+        val shouldDisableDpi = DpiConfig.autoDisableOnVpn && context != null && iad1tya.echo.music.utils.isVpnConnected(context)
+        
+        if (DpiConfig.isEnabled && !shouldDisableDpi && (DpiConfig.currentStrategy != DpiStrategy.DEFAULT || DpiConfig.customParams.isNotBlank())) {
             LocalDpiProxyServer.start()
             if (LocalDpiProxyServer.port > 0) {
                 proxy(java.net.Proxy(java.net.Proxy.Type.SOCKS, java.net.InetSocketAddress("127.0.0.1", LocalDpiProxyServer.port)))

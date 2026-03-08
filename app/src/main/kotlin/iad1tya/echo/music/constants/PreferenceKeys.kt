@@ -44,7 +44,9 @@ val CropAlbumArtKey = booleanPreferencesKey("cropAlbumArt")
 val SeekExtraSeconds = booleanPreferencesKey("seekExtraSeconds")
 val PauseOnMute = booleanPreferencesKey("pauseOnMute")
 val ResumeOnBluetoothConnectKey = booleanPreferencesKey("resumeOnBluetoothConnect")
-val KeepScreenOn = booleanPreferencesKey("keepScreenOn")
+val KeepScreenOn = booleanPreferencesKey("keep_screen_on")
+val YoutubeVideoFallbackKey = booleanPreferencesKey("youtube_video_fallback")
+val AutoDisableDpiOnVpnKey = booleanPreferencesKey("auto_disable_dpi_on_vpn")
 val DeveloperModeKey = booleanPreferencesKey("developerMode")
 
 enum class SliderStyle {

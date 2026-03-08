@@ -77,9 +77,9 @@ class App : Application(), SingletonImageLoader.Factory {
         DpiConfig.isEnabled = settings[DpiConfig.DpiEnabledKey] ?: true
         val strategyStr = settings[DpiConfig.DpiStrategyKey] ?: DpiStrategy.DEFAULT.name
         DpiConfig.currentStrategy = try { DpiStrategy.valueOf(strategyStr) } catch (e: Exception) { DpiStrategy.DEFAULT }
-        DpiConfig.customParams = settings[DpiConfig.DpiCustomParamsKey] ?: ""
+        DpiConfig.autoDisableOnVpn = settings[DpiConfig.AutoDisableDpiOnVpnKey] ?: false
 
-        YouTube.customClientBuilder = { it.applyDpi() }
+        YouTube.customClientBuilder = { it.applyDpi(this@App) }
 
         YouTube.locale = YouTubeLocale(
             gl = settings[ContentCountryKey]?.takeIf { it != SYSTEM_DEFAULT }
@@ -170,8 +170,8 @@ class App : Application(), SingletonImageLoader.Factory {
             dataStore.data.collect { settings ->
                 DpiConfig.isEnabled = settings[DpiConfig.DpiEnabledKey] ?: true
                 val str = settings[DpiConfig.DpiStrategyKey] ?: DpiStrategy.DEFAULT.name
-                DpiConfig.currentStrategy = try { DpiStrategy.valueOf(str) } catch (e: Exception) { DpiStrategy.DEFAULT }
                 DpiConfig.customParams = settings[DpiConfig.DpiCustomParamsKey] ?: ""
+                DpiConfig.autoDisableOnVpn = settings[DpiConfig.AutoDisableDpiOnVpnKey] ?: false
             }
         }
 
@@ -234,7 +234,7 @@ class App : Application(), SingletonImageLoader.Factory {
         return ImageLoader.Builder(this).apply {
             components {
                 add(OkHttpNetworkFetcherFactory(
-                    callFactory = { okhttp3.OkHttpClient.Builder().applyDpi().build() }
+                    callFactory = { okhttp3.OkHttpClient.Builder().applyDpi(this@App).build() }
                 ))
             }
             crossfade(false)

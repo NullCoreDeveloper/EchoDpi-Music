@@ -88,6 +88,7 @@ object YTPlayerUtils {
         playlistId: String? = null,
         audioQuality: AudioQuality,
         connectivityManager: ConnectivityManager,
+        enableFallback: Boolean = true,
     ): Result<PlaybackData> = runCatching {
         coroutineScope {
             Timber.tag(logTag).d("Fetching player response for videoId: $videoId, playlistId: $playlistId")
@@ -139,7 +140,7 @@ object YTPlayerUtils {
             var mainPlayerResponse = mainPlayerResponseResult.getOrNull()
 
             // Handle geo-restriction / unavailability fallback
-            if (mainPlayerResponse == null || mainPlayerResponse.playabilityStatus.status != "OK") {
+            if (enableFallback && (mainPlayerResponse == null || mainPlayerResponse.playabilityStatus.status != "OK")) {
                 val status = mainPlayerResponse?.playabilityStatus?.status
                 val reason = mainPlayerResponse?.playabilityStatus?.reason
                 Timber.tag(logTag).d("Main client failed with status $status ($reason). Attempting fallback to YouTube video search.")
@@ -163,7 +164,8 @@ object YTPlayerUtils {
                         videoId = fallbackVideoId,
                         playlistId = null, // Don't pass playlistId for fallback video
                         audioQuality = audioQuality,
-                        connectivityManager = connectivityManager
+                        connectivityManager = connectivityManager,
+                        enableFallback = false // Don't fallback recursively
                     ).map { playbackData ->
                         // Preserve original video details from the restricted track if possible
                         playbackData.copy(

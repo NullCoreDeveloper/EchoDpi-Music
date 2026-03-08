@@ -410,4 +410,10 @@
 
     <!-- Widget -->
     <string name="widget_description">Music player widget</string>
+    <string name="enable_anti_dpi_title">Enable anti-slowdown</string>
+    <string name="enable_anti_dpi_desc">Helps bypass streaming slowdowns or blocks (DPI)</string>
+    <string name="youtube_video_fallback">YouTube Video Fallback</string>
+    <string name="youtube_video_fallback_desc">Fallback to YouTube video when track is unavailable</string>
+    <string name="vpn_bypass_title">Bypass on VPN</string>
+    <string name="vpn_bypass_desc">Automatically disable anti-DPI when VPN is connected</string>
 </resources>
