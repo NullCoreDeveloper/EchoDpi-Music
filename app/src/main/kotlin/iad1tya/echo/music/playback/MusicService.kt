@@ -2100,6 +2100,7 @@ class MusicService :
                     audioQuality = audioQuality,
                     connectivityManager = connectivityManager,
                     enableFallback = youtubeVideoFallbackEnabled,
+                    databaseDao = database,
                 )
             }.getOrElse { throwable ->
                 when (throwable) {
@@ -2564,6 +2565,7 @@ class MusicService :
                 audioQuality = audioQuality,
                 connectivityManager = connectivityManager,
                 enableFallback = youtubeVideoFallbackEnabled,
+                databaseDao = database,
             ).getOrNull()
             
             val streamUrl = playbackData?.streamUrl

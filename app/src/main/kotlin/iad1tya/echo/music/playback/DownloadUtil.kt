@@ -88,7 +88,8 @@ constructor(
                     mediaId,
                     audioQuality = audioQuality,
                     connectivityManager = connectivityManager,
-                    enableFallback = youtubeVideoFallbackEnabled
+                    enableFallback = youtubeVideoFallbackEnabled,
+                    databaseDao = database
                 )
             }.getOrThrow()
             val format = playbackData.format

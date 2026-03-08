@@ -1557,6 +1557,9 @@ interface DatabaseDao {
     @Upsert
     fun upsert(song: SongEntity)
 
+    @Upsert
+    suspend fun upsert(setVideoId: SetVideoIdEntity)
+
     @Delete
     fun delete(song: SongEntity)
 

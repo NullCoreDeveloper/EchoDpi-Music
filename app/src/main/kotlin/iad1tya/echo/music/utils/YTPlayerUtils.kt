@@ -21,7 +21,8 @@ import com.echo.innertube.models.YouTubeClient.Companion.WEB_CREATOR
 import com.echo.innertube.models.YouTubeClient.Companion.WEB_REMIX
 import com.echo.innertube.models.response.PlayerResponse
 import okhttp3.OkHttpClient
-import timber.log.Timber
+import iad1tya.echo.music.db.DatabaseDao
+import iad1tya.echo.music.db.entities.SetVideoIdEntity
 import iad1tya.echo.music.utils.potoken.PoTokenGenerator
 import iad1tya.echo.music.utils.potoken.PoTokenResult
 import kotlinx.coroutines.*
@@ -89,6 +90,7 @@ object YTPlayerUtils {
         audioQuality: AudioQuality,
         connectivityManager: ConnectivityManager,
         enableFallback: Boolean = true,
+        databaseDao: DatabaseDao? = null,
     ): Result<PlaybackData> = runCatching {
         coroutineScope {
             Timber.tag(logTag).d("Fetching player response for videoId: $videoId, playlistId: $playlistId")
@@ -136,14 +138,23 @@ object YTPlayerUtils {
                 }
             Timber.tag(logTag).d("Signature timestamp: $signatureTimestamp")
 
-            var mainPlayerResponseResult = YouTube.player(videoId, apiPlaylistId, MAIN_CLIENT, signatureTimestamp, null)
+            var currentVideoId = videoId
+            if (enableFallback && databaseDao != null) {
+                val cachedFallback = databaseDao.getSetVideoId(videoId)
+                if (cachedFallback != null && cachedFallback.setVideoId != null) {
+                    currentVideoId = cachedFallback.setVideoId!!
+                    Timber.tag(logTag).d("Using cached fallback videoId: $currentVideoId for original: $videoId")
+                }
+            }
+
+            var mainPlayerResponseResult = YouTube.player(currentVideoId, apiPlaylistId, MAIN_CLIENT, signatureTimestamp, null)
             var mainPlayerResponse = mainPlayerResponseResult.getOrNull()
 
             // Handle geo-restriction / unavailability fallback
             if (enableFallback && (mainPlayerResponse == null || mainPlayerResponse.playabilityStatus.status != "OK")) {
                 val status = mainPlayerResponse?.playabilityStatus?.status
                 val reason = mainPlayerResponse?.playabilityStatus?.reason
-                Timber.tag(logTag).d("Main client failed with status $status ($reason). Attempting fallback to YouTube video search.")
+                Timber.tag(logTag).d("Track $currentVideoId failed with status $status ($reason). Attempting fallback search.")
 
                 val searchTitle = mainPlayerResponse?.videoDetails?.title
                 val searchAuthor = mainPlayerResponse?.videoDetails?.author
@@ -154,20 +165,20 @@ object YTPlayerUtils {
                 }
 
                 val fallbackVideoId = searchVideoId(searchQuery)
-                if (fallbackVideoId != null && fallbackVideoId != videoId) {
+                if (fallbackVideoId != null && fallbackVideoId != currentVideoId) {
                     Timber.tag(logTag).d("Found fallback videoId: $fallbackVideoId for query: $searchQuery. Retrying with videoId.")
-                    // Retry playerResponseForPlayback with the new fallback video ID
-                    // We call it recursively but we need to make sure we don't loop infinitely.
-                    // Since we already matched fallbackVideoId != videoId, it's safe for one level.
-                    // But to be even safer, we can just call the core logic again or use a marker.
+                    
+                    // Save to database for future "silent" fallback
+                    databaseDao?.upsert(SetVideoIdEntity(videoId, fallbackVideoId))
+
                     return@coroutineScope playerResponseForPlayback(
                         videoId = fallbackVideoId,
-                        playlistId = null, // Don't pass playlistId for fallback video
+                        playlistId = null,
                         audioQuality = audioQuality,
                         connectivityManager = connectivityManager,
-                        enableFallback = false // Don't fallback recursively
+                        enableFallback = false,
+                        databaseDao = databaseDao
                     ).map { playbackData ->
-                        // Preserve original video details from the restricted track if possible
                         playbackData.copy(
                             videoDetails = mainPlayerResponse?.videoDetails ?: playbackData.videoDetails
                         )

@@ -59,6 +59,7 @@ object RingtoneHelper {
                 videoId = songId,
                 audioQuality = AudioQuality.AUTO,
                 connectivityManager = connectivityManager,
+                databaseDao = null
             ).getOrElse {
                 Log.e(TAG, "Failed to get stream URL: ${it.message}")
                 return@withContext null
