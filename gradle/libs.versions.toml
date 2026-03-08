@@ -42,7 +42,7 @@ firebaseCrashlyticsGradle = "3.0.2"
 castFramework = "21.5.0"
 mlkitLanguageId = "17.0.6"
 mlkitTranslate = "17.0.3"
-nanojson = "1.9.1"
+nanojson = "1.9"
 javaWebSocket = "1.4.1"
 spotbugs = "4.7.1"
 autolink = "0.10.0"
@@ -131,7 +131,7 @@ nanohttpd = { module = "org.nanohttpd:nanohttpd", version.ref = "nanohttpd" }
 
 #newpipe-extractor = { module = "com.github.libre-tube:NewPipeExtractor", version = "70abbdb" }
 #newpipe-extractor = { module = "com.github.TeamNewPipe:NewPipeExtractor", version = "dev-SNAPSHOT" }
-extractor = { module = "com.github.MetrolistGroup:MetrolistExtractor", version = "v4.7.9" }
+#extractor = { module = "com.github.MetrolistGroup:MetrolistExtractor", version = "v4.7.9" }
 
 kuromoji-ipadic = { module = "com.atilika.kuromoji:kuromoji-ipadic", version.ref = "kuromojiIpadic" }
 
@@ -144,7 +144,7 @@ firebase-crashlytics-gradle = { module = "com.google.firebase:firebase-crashlyti
 mlkit-language-id = { module = "com.google.mlkit:language-id", version.ref = "mlkitLanguageId" }
 mlkit-translate = { module = "com.google.mlkit:translate", version.ref = "mlkitTranslate" }
 
-nanojson = { module = "com.github.TeamNewPipe:nanojson", version.ref = "nanojson" }
+nanojson = { module = "com.grack:nanojson", version.ref = "nanojson" }
 java-websocket = { module = "org.java-websocket:Java-WebSocket", version.ref = "javaWebSocket" }
 spotbugs-annotations = { module = "com.github.spotbugs:spotbugs-annotations", version.ref = "spotbugs" }
 autolink = { module = "org.nibor.autolink:autolink", version.ref = "autolink" }
