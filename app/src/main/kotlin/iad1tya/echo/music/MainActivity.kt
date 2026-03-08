@@ -466,7 +466,7 @@ class MainActivity : ComponentActivity() {
                                     val currentVersion = BuildConfig.VERSION_NAME
                                     
                                     // Robust comparison
-                                    fun parse(v: String) = v.removePrefix("v").split(".").map { it.toIntOrNull() ?: 0 }
+                                    fun parse(v: String) = v.removePrefix("v").split(Regex("[.-]")).map { it.toIntOrNull() ?: 0 }
                                     val v1 = parse(version)
                                     val v2 = parse(currentVersion)
                                     
