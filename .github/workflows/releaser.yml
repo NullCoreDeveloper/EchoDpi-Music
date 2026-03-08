@@ -27,11 +27,11 @@ jobs:
     - name: Build and Sign Release APK
       run: |
         if [ -z "${{ secrets.RELEASE_KEYSTORE }}" ]; then
-          echo "::error::RELEASE_KEYSTORE secret is missing! Building unsigned APK."
+          echo "::error::RELEASE_KEYSTORE secret is missing! Build will fail (signed versions only)."
           ./gradlew assembleUniversalRelease
         else
-          # Decode keystore robustly (removing any accidental whitespace)
-          echo "${{ secrets.RELEASE_KEYSTORE }}" | tr -d '[:space:]' | base64 -d > release.keystore
+          # Decode keystore robustly using printf to avoid trailing newlines
+          printf "%s" "${{ secrets.RELEASE_KEYSTORE }}" | base64 -d > release.keystore
           
           export KEYSTORE_PATH=$(pwd)/release.keystore
           export STORE_PASSWORD="${{ secrets.RELEASE_STORE_PASSWORD }}"

@@ -74,13 +74,11 @@ android {
             keyPassword = "android"
         }
         create("release") {
-            val keystorePath = System.getenv("KEYSTORE_PATH") ?: project.findProperty("KEYSTORE_PATH") as String?
-            if (keystorePath != null) {
-                storeFile = file(keystorePath)
-            }
-            storePassword = System.getenv("STORE_PASSWORD") ?: project.findProperty("STORE_PASSWORD") as String?
-            keyAlias = System.getenv("KEY_ALIAS") ?: project.findProperty("KEY_ALIAS") as String?
-            keyPassword = System.getenv("KEY_PASSWORD") ?: project.findProperty("KEY_PASSWORD") as String?
+            val path = System.getenv("KEYSTORE_PATH")
+            storeFile = if (path != null) file(path) else rootProject.file("release.keystore")
+            storePassword = System.getenv("STORE_PASSWORD")
+            keyAlias = System.getenv("KEY_ALIAS")
+            keyPassword = System.getenv("KEY_PASSWORD")
         }
         getByName("debug") {
             keyAlias = "androiddebugkey"
@@ -96,12 +94,7 @@ android {
             isShrinkResources = true
             isCrunchPngs = false
             isDebuggable = false
-            
-            val releaseConfigs = signingConfigs.getByName("release")
-            if (releaseConfigs.storeFile?.exists() == true) {
-                signingConfig = releaseConfigs
-            }
-            
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
