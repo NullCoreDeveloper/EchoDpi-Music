@@ -227,6 +227,9 @@ class MusicService :
     @Inject
     lateinit var hapticsManager: MusicHapticsManager
 
+    @Inject
+    lateinit var downloadUtil: DownloadUtil
+
     private lateinit var audioManager: AudioManager
     private var audioFocusRequest: AudioFocusRequest? = null
     private var lastAudioFocusState = AudioManager.AUDIOFOCUS_NONE
@@ -313,9 +316,7 @@ class MusicService :
             playerCache.removeResource(songId)
             downloadCache.removeResource(songId)
             // Also notify downloadManager to stop if it's currently downloading
-            if (::downloadUtil.isInitialized) {
-                downloadUtil.downloadManager.removeDownload(songId)
-            }
+            downloadUtil.downloadManager.removeDownload(songId)
         } catch (e: Exception) {
             // Ignore
         }

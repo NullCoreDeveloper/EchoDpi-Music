@@ -168,9 +168,9 @@ constructor(
                         scope.launch {
                             try {
                                 val ok = downloadCache.removeResource(download.request.id)
-                                iad1tya.echo.music.utils.Timber.tag("DownloadUtil").d("Removed resource ${download.request.id}: $ok")
+                                android.util.Log.d("DownloadUtil", "Removed resource ${download.request.id}: $ok")
                             } catch (e: Exception) {
-                                iad1tya.echo.music.utils.Timber.tag("DownloadUtil").e(e, "Failed to remove resource ${download.request.id}")
+                                android.util.Log.e("DownloadUtil", "Failed to remove resource ${download.request.id}", e)
                             }
                             database.updateDownloadedInfo(download.request.id, false, null)
                         }
