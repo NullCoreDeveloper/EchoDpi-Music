@@ -2107,7 +2107,7 @@ class MusicService :
             // Optimization: if it's already cached/downloaded AND we don't need a fresh URL (it's in songUrlCache)
             // we skip resolving. But if it's NOT in songUrlCache, even if it's in downloadCache, 
             // we MUST resolve to potentially get a different source or metadata.
-            if (cachedUrl != null && (downloadCache.isCached(
+            val isCached = downloadCache.isCached(
                     mediaId,
                     dataSpec.position,
                     if (dataSpec.length >= 0) dataSpec.length else 1L
@@ -2115,10 +2115,11 @@ class MusicService :
                     mediaId,
                     dataSpec.position,
                     if (dataSpec.length >= 0) dataSpec.length else 1L
-                ))
-            ) {
+                )
+
+            if (isCached) {
                 scope.launch(Dispatchers.IO) { recoverSong(mediaId) }
-                return@Factory dataSpec
+                return@Factory if (cachedUrl != null) dataSpec.withUri(cachedUrl.first.toUri()) else dataSpec
             }
 
             cachedUrl?.let {

@@ -79,8 +79,11 @@ constructor(
 
             val cachedUrl = songUrlCache[mediaId]?.takeIf { it.second > System.currentTimeMillis() }
 
-            if (cachedUrl != null && playerCache.isCached(mediaId, dataSpec.position, length)) {
-                return@Factory dataSpec
+            val isCached = playerCache.isCached(mediaId, dataSpec.position, length) || 
+                           downloadCache.isCached(mediaId, dataSpec.position, length)
+
+            if (isCached) {
+                return@Factory if (cachedUrl != null) dataSpec.withUri(cachedUrl.first.toUri()) else dataSpec
             }
 
             cachedUrl?.let {
