@@ -581,6 +581,7 @@ fun SongMenu(
                                 )
                             },
                             modifier = Modifier.clickable {
+                                playerConnection.service.clearUrlCache(song.id)
                                 DownloadService.sendRemoveDownload(
                                     context,
                                     ExoDownloadService::class.java,
@@ -607,6 +608,7 @@ fun SongMenu(
                                 )
                             },
                             modifier = Modifier.clickable {
+                                playerConnection.service.clearUrlCache(song.id)
                                 DownloadService.sendRemoveDownload(
                                     context,
                                     ExoDownloadService::class.java,

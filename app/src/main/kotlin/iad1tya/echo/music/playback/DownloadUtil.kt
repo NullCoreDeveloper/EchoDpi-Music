@@ -33,6 +33,39 @@ import java.util.concurrent.Executor
 import javax.inject.Inject
 import javax.inject.Singleton
 
+import android.content.Context
+import android.net.ConnectivityManager
+import androidx.core.content.getSystemService
+import androidx.core.net.toUri
+import androidx.media3.database.DatabaseProvider
+import androidx.media3.datasource.ResolvingDataSource
+import androidx.media3.datasource.cache.CacheDataSource
+import androidx.media3.datasource.cache.SimpleCache
+import androidx.media3.datasource.okhttp.OkHttpDataSource
+import androidx.media3.exoplayer.offline.Download
+import androidx.media3.exoplayer.offline.DownloadManager
+import androidx.media3.exoplayer.offline.DownloadNotificationHelper
+import com.echo.innertube.YouTube
+import iad1tya.echo.music.constants.AudioQuality
+import iad1tya.echo.music.constants.AudioQualityKey
+import iad1tya.echo.music.db.MusicDatabase
+import iad1tya.echo.music.db.entities.FormatEntity
+import iad1tya.echo.music.db.entities.SongEntity
+import iad1tya.echo.music.di.DownloadCache
+import iad1tya.echo.music.di.PlayerCache
+import iad1tya.echo.music.utils.YTPlayerUtils
+import iad1tya.echo.music.utils.enumPreference
+import iad1tya.echo.music.utils.preference
+import iad1tya.echo.music.utils.dataStore
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.*
+import okhttp3.OkHttpClient
+import java.time.LocalDateTime
+import java.util.concurrent.Executor
+import javax.inject.Inject
+import javax.inject.Singleton
+
 @Singleton
 class DownloadUtil
 @Inject
@@ -154,7 +187,7 @@ constructor(
             databaseProvider,
             downloadCache,
             dataSourceFactory,
-            Executor(Runnable::run)
+            Dispatchers.IO.asExecutor()
         ).apply {
             maxParallelDownloads = 6
             addListener(
@@ -190,7 +223,12 @@ constructor(
                         scope.launch {
                             when (download.state) {
                                 Download.STATE_COMPLETED -> {
-                                    database.updateDownloadedInfo(download.request.id, true, LocalDateTime.now())
+                                    if (downloadCache.isCached(download.request.id, 0, C.LENGTH_UNSET)) {
+                                        database.updateDownloadedInfo(download.request.id, true, LocalDateTime.now())
+                                    } else {
+                                        android.util.Log.w("DownloadUtil", "Download completed but resource not in cache: ${download.request.id}")
+                                        database.updateDownloadedInfo(download.request.id, false, null)
+                                    }
                                 }
                                 Download.STATE_FAILED,
                                 Download.STATE_STOPPED,
