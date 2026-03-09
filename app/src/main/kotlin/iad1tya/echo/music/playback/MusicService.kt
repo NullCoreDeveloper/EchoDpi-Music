@@ -2110,11 +2110,11 @@ class MusicService :
             if (cachedUrl != null && (downloadCache.isCached(
                     mediaId,
                     dataSpec.position,
-                    if (dataSpec.length >= 0) dataSpec.length else 1
+                    if (dataSpec.length >= 0) dataSpec.length else 1L
                 ) || playerCache.isCached(
                     mediaId,
                     dataSpec.position,
-                    if (dataSpec.length >= 0) dataSpec.length else 1
+                    if (dataSpec.length >= 0) dataSpec.length else 1L
                 ))
             ) {
                 scope.launch(Dispatchers.IO) { recoverSong(mediaId) }
@@ -2128,10 +2128,10 @@ class MusicService :
 
             // Need to fetch a new URL - either first time or URL expired
             // Check if this is an uploaded song that needs special handling
-            val isUploadedSong = runBlocking(Dispatchers.IO) {
+            val isUploadedSong = runBlocking {
                 database.song(mediaId).first()?.song?.isUploaded == true
             }
-            val playbackData = runBlocking(Dispatchers.IO) {
+            val playbackData = runBlocking {
                 YTPlayerUtils.playerResponseForPlayback(
                     mediaId,
                     playlistId = if (isUploadedSong) "MLPT" else null,

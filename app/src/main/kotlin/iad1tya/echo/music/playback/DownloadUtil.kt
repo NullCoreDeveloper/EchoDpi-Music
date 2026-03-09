@@ -75,7 +75,7 @@ constructor(
                 ),
         ) { dataSpec ->
             val mediaId = dataSpec.key ?: error("No media id")
-            val length = if (dataSpec.length >= 0) dataSpec.length else 1
+            val length = if (dataSpec.length >= 0) dataSpec.length else 1L
 
             val cachedUrl = songUrlCache[mediaId]?.takeIf { it.second > System.currentTimeMillis() }
 
@@ -87,7 +87,7 @@ constructor(
                 return@Factory dataSpec.withUri(it.first.toUri())
             }
 
-            val playbackData = runBlocking(Dispatchers.IO) {
+            val playbackData = runBlocking {
                 YTPlayerUtils.playerResponseForPlayback(
                     mediaId,
                     audioQuality = audioQuality,
