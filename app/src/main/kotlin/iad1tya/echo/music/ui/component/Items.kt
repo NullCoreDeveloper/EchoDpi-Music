@@ -368,7 +368,8 @@ fun SongGridItem(
         Text(
             text = joinByBullet(
                 song.artists.joinToString { it.name },
-                makeTimeString(song.song.duration * 1000L)
+                makeTimeString(song.song.duration * 1000L),
+                if (song.song.playbackSource == 2) "[YT]" else null
             ),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.secondary,

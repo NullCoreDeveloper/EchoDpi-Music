@@ -115,11 +115,10 @@ constructor(
                 val existing = getSongEntityByIdBlocking(mediaId)
 
                 val updatedSong = if (existing != null) {
-                    if (existing.dateDownload == null) {
-                        existing.copy(dateDownload = now)
-                    } else {
-                        existing
-                    }
+                    existing.copy(
+                        dateDownload = existing.dateDownload ?: now,
+                        playbackSource = playbackData.playbackSource
+                    )
                 } else {
                     SongEntity(
                         id = mediaId,
@@ -127,7 +126,8 @@ constructor(
                         duration = playbackData.videoDetails?.lengthSeconds?.toIntOrNull() ?: 0,
                         thumbnailUrl = playbackData.videoDetails?.thumbnail?.thumbnails?.lastOrNull()?.url,
                         dateDownload = now,
-                        isDownloaded = existing?.isDownloaded ?: false
+                        isDownloaded = existing?.isDownloaded ?: false,
+                        playbackSource = playbackData.playbackSource
                     )
                 }
 
@@ -164,6 +164,11 @@ constructor(
                             }
                         }
                         scope.launch {
+                            try {
+                                downloadCache.removeResource(download.request.id)
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
                             database.updateDownloadedInfo(download.request.id, false, null)
                         }
                     }

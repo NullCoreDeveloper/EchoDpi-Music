@@ -116,33 +116,64 @@ class DpiOutputStream(
             return
         }
         
-        // Перехватываем только первые данные в сокете (TLS Client Hello)
-        if (len > 5 && b[off] == 0x16.toByte() && b[off + 1] == 0x03.toByte()) {
+        // Detect TLS Client Hello (Handshake [0x16] + Legacy Version [0x03 0x01/0x03/0x02] + length + Type [0x01])
+        if (len > 5 && b[off] == 0x16.toByte() && b[off + 1] == 0x03.toByte() && b[off + 5] == 0x01.toByte()) {
             isFirstPacket = false
             try {
                 val fullParams = if (params.isNotBlank()) params else strategy.params
                 
-                // Простейший парсер параметров -s (split), -o (oob/urgent) и -d (delay)
+                // Advanced Parser for sequential or single flags
                 val splitSize = Regex("-s(\\d+)").find(fullParams)?.groupValues?.get(1)?.toIntOrNull() ?: 64
-                val useOob = fullParams.contains("-o1") || fullParams.contains("-o2")
+                val splitAtHost = fullParams.contains("+h") || fullParams.contains("+s")
+                val useDisorder = fullParams.contains("-d1")
+                val oobMode = when {
+                    fullParams.contains("-o1") -> 1
+                    fullParams.contains("-o2") -> 2
+                    else -> 0
+                }
+                val oobChar = Regex("-e(\\d+)").find(fullParams)?.groupValues?.get(1)?.toIntOrNull()?.toByte() ?: 0xFF.toByte()
+                val useFake = fullParams.contains("-f1")
                 val delayMs = Regex("-d(\\d+)").find(fullParams)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
 
                 var bytesWritten = 0
                 
-                // Ограничиваем нарезку только первыми 512 байтами для TLS Client Hello.
-                // Остальное отправляем целиком, чтобы не замедлять передачу данных.
-                val splitLimit = if (len > 512) 512 else len
+                // 1. Fake Packet Strategy
+                if (useFake) {
+                    val fakeSni = "google.com" // Default fake SNI if not specified
+                    val fakeHello = createFakeClientHello(fakeSni)
+                    delegate.write(fakeHello)
+                    delegate.flush()
+                }
+
+                // 2. Disorder Strategy (send 1 byte first)
+                if (useDisorder) {
+                    delegate.write(b, off, 1)
+                    delegate.flush()
+                    bytesWritten = 1
+                }
+
+                // 3. Find SNI for split position if requested
+                var currentSplitPos = splitSize
+                if (splitAtHost) {
+                    val sniPos = findSniPosition(b, off, len)
+                    if (sniPos != -1) {
+                        currentSplitPos = sniPos - off
+                    }
+                }
+
+                // Process splitting (mostly for the first 1024 bytes of handshake)
+                val splitLimit = if (len > 1024) 1024 else len
 
                 while (bytesWritten < splitLimit) {
                     val remaining = splitLimit - bytesWritten
-                    val size = if (remaining > splitSize) splitSize else remaining
+                    val size = if (remaining > currentSplitPos) currentSplitPos else remaining
                     
-                    if (useOob && bytesWritten == 0) {
-                        delegate.write(b, off, 1)
+                    if (oobMode > 0 && bytesWritten == 0) {
+                        delegate.write(b, off + bytesWritten, 1)
                         delegate.flush()
-                        try { socket.sendUrgentData(0xFF) } catch (e: Exception) {}
+                        try { socket.sendUrgentData(oobChar.toInt()) } catch (e: Exception) {}
                         if (size > 1) {
-                            delegate.write(b, off + 1, size - 1)
+                            delegate.write(b, off + bytesWritten + 1, size - 1)
                         }
                     } else {
                         delegate.write(b, off + bytesWritten, size)
@@ -156,7 +187,7 @@ class DpiOutputStream(
                     }
                 }
                 
-                // Дописываем остаток, если он есть
+                // 4. Send remaining payload
                 if (bytesWritten < len) {
                     delegate.write(b, off + bytesWritten, len - bytesWritten)
                 }
@@ -167,6 +198,33 @@ class DpiOutputStream(
         } else {
             delegate.write(b, off, len)
         }
+    }
+
+    private fun findSniPosition(b: ByteArray, off: Int, len: Int): Int {
+        // Search for SNI extension tag (0x00 0x00)
+        // Skip Record Header (5), Handshake Header (4), Version (2), Random (32), Session ID (1+)
+        if (len < 60) return -1
+        for (i in off + 43 until off + len - 4) {
+            if (b[i] == 0x00.toByte() && b[i+1] == 0x00.toByte() && b[i+2].toInt() > 0 && b[i+3] == 0x00.toByte()) {
+                return i
+            }
+        }
+        return -1
+    }
+
+    private fun createFakeClientHello(sni: String): ByteArray {
+        // Minimal valid-ish TLS Client Hello with fake SNI
+        val sniBytes = sni.toByteArray()
+        val totalLen = 42 + sniBytes.size
+        val out = ByteArray(totalLen + 5)
+        out[0] = 0x16.toByte() // Handshake
+        out[1] = 0x03.toByte()
+        out[2] = 0x01.toByte()
+        out[3] = (totalLen shr 8).toByte()
+        out[4] = (totalLen and 0xFF).toByte()
+        out[5] = 0x01.toByte() // Client Hello
+        // ... rest is simplified for a "fake" packet that should just confuse DPI
+        return out
     }
     
     override fun flush() = delegate.flush()

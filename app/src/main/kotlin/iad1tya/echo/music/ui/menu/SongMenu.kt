@@ -318,6 +318,7 @@ fun SongMenu(
                                 updatePlaybackSource(song.id, source)
                             }
                             downloadUtil.removeFromCache(song.id)
+                            playerConnection.service.clearUrlCache(song.id)
                             showSourceSelectionDialog = false
                             onDismiss()
                         }

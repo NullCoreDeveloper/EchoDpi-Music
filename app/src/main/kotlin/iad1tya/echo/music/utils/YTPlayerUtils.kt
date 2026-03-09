@@ -78,6 +78,7 @@ object YTPlayerUtils {
         val format: PlayerResponse.StreamingData.Format,
         val streamUrl: String,
         val streamExpiresInSeconds: Int,
+        val playbackSource: Int = 0,
     )
     /**
      * Custom player response intended to use for playback.
@@ -443,12 +444,13 @@ object YTPlayerUtils {
             Timber.tag(logTag).d("Cached public videoId: $videoId for future private track resolution")
         }
             PlaybackData(
-                audioConfig,
-                videoDetails,
-                playbackTracking,
-                format,
-                streamUrl,
-                streamExpiresInSeconds,
+                audioConfig = audioConfig,
+                videoDetails = videoDetails,
+                playbackTracking = playbackTracking,
+                format = format!!,
+                streamUrl = streamUrl!!,
+                streamExpiresInSeconds = streamExpiresInSeconds!!,
+                playbackSource = if (isErrorFallback || fallbackVideoId != null) 2 else songPlaybackSource
             )
         }
     }

@@ -307,6 +307,10 @@ class MusicService :
 
     private val songUrlCache = java.util.concurrent.ConcurrentHashMap<String, Pair<String, Long>>()
 
+    fun clearUrlCache(songId: String) {
+        songUrlCache.remove(songId)
+    }
+
     // Enhanced error tracking for strict retry management
     private var currentMediaIdRetryCount = mutableMapOf<String, Int>()
     private val MAX_RETRY_PER_SONG = 3
@@ -1085,8 +1089,12 @@ class MusicService :
                 .getOrNull()?.videoDetails)?.lengthSeconds?.toInt()
             ?: -1
         database.query {
-            if (song == null) insert(mediaMetadata.copy(duration = duration))
-            else if (song.song.duration == -1) update(song.song.copy(duration = duration))
+            val songToUpdate = (song?.song ?: mediaMetadata.toSongEntity()).copy(
+                duration = duration,
+                playbackSource = if (playbackData != null) playbackData.playbackSource else (song?.song?.playbackSource ?: 0)
+            )
+            if (song == null) insert(songToUpdate)
+            else update(songToUpdate)
         }
         if (!database.hasRelatedSongs(mediaId)) {
             val relatedEndpoint =
