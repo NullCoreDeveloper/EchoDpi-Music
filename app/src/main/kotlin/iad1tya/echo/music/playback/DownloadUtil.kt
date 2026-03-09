@@ -51,6 +51,8 @@ constructor(
     private val songUrlCache = HashMap<String, Pair<String, Long>>()
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val lastDownloadStates = java.util.concurrent.ConcurrentHashMap<String, Int>()
+    private val lastDownloadPercents = java.util.concurrent.ConcurrentHashMap<String, Int>()
 
     val downloads = MutableStateFlow<Map<String, Download>>(emptyMap())
 
@@ -160,7 +162,7 @@ constructor(
             dataSourceFactory,
             Dispatchers.IO.asExecutor()
         ).apply {
-            maxParallelDownloads = 6
+            maxParallelDownloads = 3
             addListener(
                 object : DownloadManager.Listener {
                     override fun onDownloadRemoved(downloadManager: DownloadManager, download: Download) {
@@ -185,29 +187,48 @@ constructor(
                         download: Download,
                         finalException: Exception?,
                     ) {
-                        downloads.update { map ->
-                            map.toMutableMap().apply {
-                                set(download.request.id, download)
+                        val id = download.request.id
+                        val state = download.state
+                        val percent = download.percentDownloaded.toInt().coerceIn(0, 100)
+                        
+                        val lastState = lastDownloadStates[id]
+                        val lastPercent = lastDownloadPercents[id]
+
+                        // Throttle updates: only if state changed OR percent changed by at least 1%
+                        val stateChanged = lastState != state
+                        val percentChanged = lastPercent != percent
+
+                        if (stateChanged || percentChanged) {
+                            lastDownloadStates[id] = state
+                            lastDownloadPercents[id] = percent
+                            
+                            downloads.update { map ->
+                                map.toMutableMap().apply {
+                                    set(id, download)
+                                }
                             }
                         }
 
-                        scope.launch {
-                            when (download.state) {
-                                Download.STATE_COMPLETED -> {
-                                    if (downloadCache.isCached(download.request.id, 0L, 1L)) {
-                                        database.updateDownloadedInfo(download.request.id, true, LocalDateTime.now())
-                                    } else {
-                                        android.util.Log.w("DownloadUtil", "Download completed but resource not in cache: ${download.request.id}")
-                                        database.updateDownloadedInfo(download.request.id, false, null)
+                        // Only launch DB update coroutine on state transitions to terminal states
+                        if (stateChanged) {
+                            scope.launch {
+                                when (state) {
+                                    Download.STATE_COMPLETED -> {
+                                        if (downloadCache.isCached(id, 0L, 1L)) {
+                                            database.updateDownloadedInfo(id, true, LocalDateTime.now())
+                                        } else {
+                                            android.util.Log.w("DownloadUtil", "Download completed but resource not in cache: $id")
+                                            database.updateDownloadedInfo(id, false, null)
+                                        }
                                     }
-                                }
-                                Download.STATE_FAILED,
-                                Download.STATE_STOPPED,
-                                Download.STATE_REMOVING,
-                                Download.STATE_RESTARTING -> {
-                                    database.updateDownloadedInfo(download.request.id, false, null)
-                                }
-                                else -> {
+                                    Download.STATE_FAILED,
+                                    Download.STATE_STOPPED,
+                                    Download.STATE_REMOVING,
+                                    Download.STATE_RESTARTING -> {
+                                        database.updateDownloadedInfo(id, false, null)
+                                    }
+                                    else -> {
+                                    }
                                 }
                             }
                         }
