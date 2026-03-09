@@ -76,11 +76,13 @@ constructor(
             val mediaId = dataSpec.key ?: error("No media id")
             val length = if (dataSpec.length >= 0) dataSpec.length else 1
 
-            if (playerCache.isCached(mediaId, dataSpec.position, length)) {
+            val cachedUrl = songUrlCache[mediaId]?.takeIf { it.second > System.currentTimeMillis() }
+
+            if (cachedUrl != null && playerCache.isCached(mediaId, dataSpec.position, length)) {
                 return@Factory dataSpec
             }
 
-            songUrlCache[mediaId]?.takeIf { it.second > System.currentTimeMillis() }?.let {
+            cachedUrl?.let {
                 return@Factory dataSpec.withUri(it.first.toUri())
             }
 
@@ -164,6 +166,12 @@ constructor(
                             }
                         }
                         scope.launch {
+                            try {
+                                val ok = downloadCache.removeResource(download.request.id)
+                                iad1tya.echo.music.utils.Timber.tag("DownloadUtil").d("Removed resource ${download.request.id}: $ok")
+                            } catch (e: Exception) {
+                                iad1tya.echo.music.utils.Timber.tag("DownloadUtil").e(e, "Failed to remove resource ${download.request.id}")
+                            }
                             database.updateDownloadedInfo(download.request.id, false, null)
                         }
                     }
@@ -212,6 +220,11 @@ constructor(
 
     fun removeFromCache(songId: String) {
         songUrlCache.remove(songId)
+        try {
+            playerCache.removeResource(songId)
+        } catch (e: Exception) {
+            // Ignore if not in cache or if it fails
+        }
     }
 
     fun release() {

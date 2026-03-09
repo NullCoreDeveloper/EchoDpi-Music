@@ -309,6 +309,16 @@ class MusicService :
 
     fun clearUrlCache(songId: String) {
         songUrlCache.remove(songId)
+        try {
+            playerCache.removeResource(songId)
+            downloadCache.removeResource(songId)
+            // Also notify downloadManager to stop if it's currently downloading
+            if (::downloadUtil.isInitialized) {
+                downloadUtil.downloadManager.removeDownload(songId)
+            }
+        } catch (e: Exception) {
+            // Ignore
+        }
         if (player.currentMediaItem?.mediaId == songId) {
             val currentPos = player.currentPosition
             val wasPlaying = player.isPlaying
@@ -2090,8 +2100,13 @@ class MusicService :
                 )
             }
 
-            // Check if the content is already downloaded/cached
-            if (downloadCache.isCached(
+            // Check if we have a valid cached URL (not expired)
+            val cachedUrl = songUrlCache[mediaId]?.takeIf { it.second > System.currentTimeMillis() }
+            
+            // Optimization: if it's already cached/downloaded AND we don't need a fresh URL (it's in songUrlCache)
+            // we skip resolving. But if it's NOT in songUrlCache, even if it's in downloadCache, 
+            // we MUST resolve to potentially get a different source or metadata.
+            if (cachedUrl != null && (downloadCache.isCached(
                     mediaId,
                     dataSpec.position,
                     if (dataSpec.length >= 0) dataSpec.length else 1
@@ -2099,14 +2114,13 @@ class MusicService :
                     mediaId,
                     dataSpec.position,
                     if (dataSpec.length >= 0) dataSpec.length else 1
-                )
+                ))
             ) {
                 scope.launch(Dispatchers.IO) { recoverSong(mediaId) }
                 return@Factory dataSpec
             }
 
-            // Check if we have a valid cached URL (not expired)
-            songUrlCache[mediaId]?.takeIf { it.second > System.currentTimeMillis() }?.let {
+            cachedUrl?.let {
                 scope.launch(Dispatchers.IO) { recoverSong(mediaId) }
                 return@Factory dataSpec.withUri(it.first.toUri())
             }
