@@ -309,6 +309,15 @@ class MusicService :
 
     fun clearUrlCache(songId: String) {
         songUrlCache.remove(songId)
+        if (player.currentMediaItem?.mediaId == songId) {
+            val currentPos = player.currentPosition
+            val wasPlaying = player.isPlaying
+            // Force reload by re-setting media item
+            player.setMediaItem(player.currentMediaItem!!, false)
+            player.prepare()
+            player.seekTo(currentPos)
+            if (wasPlaying) player.play()
+        }
     }
 
     // Enhanced error tracking for strict retry management

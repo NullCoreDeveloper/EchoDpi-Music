@@ -164,11 +164,6 @@ constructor(
                             }
                         }
                         scope.launch {
-                            try {
-                                downloadCache.removeResource(download.request.id)
-                            } catch (e: Exception) {
-                                e.printStackTrace()
-                            }
                             database.updateDownloadedInfo(download.request.id, false, null)
                         }
                     }
