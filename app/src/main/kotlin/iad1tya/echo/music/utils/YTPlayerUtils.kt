@@ -450,7 +450,7 @@ object YTPlayerUtils {
                 format = format!!,
                 streamUrl = streamUrl!!,
                 streamExpiresInSeconds = streamExpiresInSeconds!!,
-                playbackSource = if (isErrorFallback || fallbackVideoId != null) 2 else songPlaybackSource
+                playbackSource = if (isErrorFallback || currentVideoId != videoId) 2 else songPlaybackSource
             )
         }
     }
