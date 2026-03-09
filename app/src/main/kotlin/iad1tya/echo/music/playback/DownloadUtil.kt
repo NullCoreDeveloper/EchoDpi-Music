@@ -191,7 +191,7 @@ constructor(
                         scope.launch {
                             when (download.state) {
                                 Download.STATE_COMPLETED -> {
-                                    if (downloadCache.isCached(download.request.id, 0L, C.LENGTH_UNSET)) {
+                                    if (downloadCache.isCached(download.request.id, 0L, C.LENGTH_UNSET.toLong())) {
                                         database.updateDownloadedInfo(download.request.id, true, LocalDateTime.now())
                                     } else {
                                         android.util.Log.w("DownloadUtil", "Download completed but resource not in cache: ${download.request.id}")
