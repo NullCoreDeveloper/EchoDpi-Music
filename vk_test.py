@@ -1,23 +1,44 @@
 import requests
 import json
-import sys
 import re
+import sys
 from bs4 import BeautifulSoup
+import urllib.parse
 
-def scrape_vk_audio(url: str):
+def scrape_vk_mobile(url):
     """
-    Скрейпит аудиозаписи из ВК (плейлисты или профили) без использования браузера.
-    Использует подход, аналогичный парсингу Яндекс.Музыки.
+    Прямой скрапинг мобильной версии m.vk.com. 
+    ВК отдает данные о треках в атрибутах data-audio, если имитировать мобильное устройство.
     """
     
-    # Приводим к мобильной версии для упрощения
-    if 'm.vk.com' not in url:
-        if 'vk.com/audio' in url:
-             url = url.replace('vk.com/audio', 'm.vk.com/audio')
-        elif 'vk.com/audios' in url:
-             url = url.replace('vk.com/audios', 'm.vk.com/audios')
+    # 1. Парсим параметры из входной ссылки
+    owner_id = ""
+    playlist_id = ""
+    access_hash = ""
+    
+    # Поиск шаблона плейлиста или альбома: playlist/OWNER_ID_PLAYLIST_ID_HASH или album/OWNER_ID_ALBUM_ID_HASH
+    pl_match = re.search(r'(?:playlist|album)/(-?\d+)_(\d+)(?:_([a-z0-9]+))?', url)
+    # Поиск шаблона профиля: audios123 или m.vk.com/audio123
+    ai_match = re.search(r'audio(?:s)?(-?\d+)', url)
+
+    if pl_match:
+        owner_id = pl_match.group(1)
+        playlist_id = pl_match.group(2)
+        access_hash = pl_match.group(3) if pl_match.group(3) else ""
+        
+        target_url = f"https://m.vk.com/audio?act=audio_playlist{owner_id}_{playlist_id}"
+        if access_hash:
+            target_url += f"&access_hash={access_hash}"
+    elif ai_match:
+        owner_id = ai_match.group(1)
+        target_url = f"https://m.vk.com/audio{owner_id}"
+    else:
+        # Если пришла уже готовая query-ссылка
+        if "act=audio_playlist" in url:
+            target_url = url.replace('vk.com', 'm.vk.com') if 'm.vk.com' not in url else url
         else:
-             url = url.replace('vk.com', 'm.vk.com')
+            print("[!] Не удалось распознать формат ссылки.")
+            return
 
     headers = {
         'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_8 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Mobile/15E148 Safari/604.1',
@@ -25,76 +46,67 @@ def scrape_vk_audio(url: str):
         'Accept-Language': 'ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3',
     }
 
-    print(f"[*] Запрос к: {url}")
+    session = requests.Session()
+    # Важный костыль для ВК: имитируем экран устройства
+    session.cookies.set('remixmdevice', '1920/1080/2/!!-!!!!', domain='.vk.com')
+    
+    print(f"[*] Загрузка страницы: {target_url}")
     
     try:
-        response = requests.get(url, headers=headers, timeout=15)
+        # Сначала посетим главную мобильную, чтобы получить сессионные куки (stid и т.д.)
+        session.get("https://m.vk.com/", headers=headers, timeout=10)
+        
+        response = session.get(target_url, headers=headers, timeout=15)
         response.raise_for_status()
-    except Exception as e:
-        print(f"[!] Ошибка при запросе: {e}")
-        return
+        
+        if "login" in response.url and "access_hash" not in target_url:
+            print("[!] ВК перенаправил на логин. Этот профиль закрыт настройками приватности.")
+            return
 
-    soup = BeautifulSoup(response.text, 'html.parser')
-    
-    # В мобильной версии VK данные о треках лежат в div.audio_item в атрибуте data-audio
-    audio_items = soup.select('div.audio_item')
-    
-    if not audio_items:
-        # Проверка на приватность или пустой профиль
-        if "запретил" in response.text or "приватный" in response.text:
-            print("[!] Ошибка: Доступ к аудиозаписям ограничен настройками приватности.")
-        elif "нет аудиозаписей" in response.text.lower():
-            print("[!] В этом профиле/плейлисте нет аудиозаписей.")
-        else:
-            print("[!] Треки не найдены. Возможно, структура страницы изменилась или требуется авторизация.")
-            # Для отладки можно сохранить кусок HTML
-            # with open("debug.html", "w") as f: f.write(response.text)
-        return
+        soup = BeautifulSoup(response.text, 'html.parser')
+        items = soup.select('.audio_item')
+        
+        if not items:
+            print("[!] Треки не найдены. Возможно, страница пуста или ВК заблокировал запрос.")
+            # debug
+            # with open("vk_error.html", "w", encoding="utf-8") as f: f.write(response.text)
+            return
 
-    print(f"[*] Найдено треков: {len(audio_items)}")
-    print("-" * 40)
+        print(f"[*] Найдено треков: {len(items)}")
+        print("-" * 45)
 
-    for index, item in enumerate(audio_items, 1):
-        try:
-            # Атрибут data-audio содержит JSON массив с данными трека
-            data_attr = item.get('data-audio')
-            if not data_attr:
-                continue
+        for i, item in enumerate(items, 1):
+            try:
+                # В мобильной версии данные в JSON-массиве в data-audio
+                raw_data = item.get('data-audio')
+                if not raw_data: continue
                 
-            track_data = json.loads(data_attr)
-            
-            # Структура data-audio (индексы):
-            # 3 - Название песни
-            # 4 - Исполнитель
-            # 16 - Доп. инфо (prod, feat и т.д.)
-            
-            title = track_data[3]
-            artist = track_data[4]
-            extra = track_data[16] if len(track_data) > 16 else ""
-            
-            full_title = f"{title} ({extra})" if extra else title
-            
-            # Формат: (номер). (название песни) - (автор)
-            print(f"{index}. {full_title} - {artist}")
-            
-        except (json.JSONDecodeError, IndexError) as e:
-            # Если не получилось распарсить JSON, пробуем через обычные теги
-            title_elem = item.select_one('.ai_title')
-            artist_elem = item.select_one('.ai_artist')
-            
-            title = title_elem.get_text(strip=True) if title_elem else "Неизвестно"
-            artist = artist_elem.get_text(strip=True) if artist_elem else "Неизвестно"
-            print(f"{index}. {title} - {artist} [!] (парсинг через HTML)")
+                # Исправляем возможные сущности &quot;
+                raw_data = urllib.parse.unquote(raw_data).replace('&quot;', '"')
+                data = json.loads(raw_data)
+                
+                # Структура: [id, owner, url, title, artist, duration, ...]
+                title = data[3]
+                artist = data[4]
+                # Доп. инфо (например, remix) обычно в data[16]
+                extra = data[16] if len(data) > 16 else ""
+                
+                full_name = f"{title} ({extra})" if extra and isinstance(extra, str) else title
+                
+                print(f"{i}. {full_name} - {artist}")
+            except Exception as e:
+                # Если JSON не подошел, пробуем через текст
+                t_el = item.select_one('.ai_title')
+                a_el = item.select_one('.ai_artist')
+                if t_el and a_el:
+                    print(f"{i}. {t_el.text.strip()} - {a_el.text.strip()}")
+                continue
 
-    print("-" * 40)
+        print("-" * 45)
+
+    except Exception as e:
+        print(f"[!] Ошибка: {e}")
 
 if __name__ == "__main__":
-    # Ссылка по умолчанию (плейлист из запроса)
-    default_url = "https://vk.com/music/playlist/635001978_63_5bbceadee6aef54832"
-    
-    if len(sys.argv) > 1:
-        target_url = sys.argv[1]
-    else:
-        target_url = default_url
-        
-    scrape_vk_audio(target_url)
+    url = sys.argv[1] if len(sys.argv) > 1 else "https://vk.com/music/playlist/635001978_63_5bbceadee6aef54832"
+    scrape_vk_mobile(url)
