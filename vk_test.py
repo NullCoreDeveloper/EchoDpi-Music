@@ -16,8 +16,11 @@ def scrape_vk_mobile(url):
     playlist_id = ""
     access_hash = ""
     
-    # Поиск шаблона плейлиста или альбома: playlist/OWNER_ID_PLAYLIST_ID_HASH или album/OWNER_ID_ALBUM_ID_HASH
-    pl_match = re.search(r'(?:playlist|album)/(-?\d+)_(\d+)(?:_([a-z0-9]+))?', url)
+    # Поиск шаблона плейлиста или альбома: 
+    # 1. playlist/OWNER_ID_PLAYLIST_ID_HASH
+    # 2. album/OWNER_ID_ALBUM_ID_HASH
+    # 3. z=audio_playlistOWNER_ID_PLAYLIST_ID/HASH
+    pl_match = re.search(r'(?:playlist|album|z=audio_playlist)(-?\d+)_(\d+)(?:[_/]([a-z0-9]+))?', url)
     # Поиск шаблона профиля: audios123 или m.vk.com/audio123
     ai_match = re.search(r'audio(?:s)?(-?\d+)', url)
 
@@ -33,9 +36,9 @@ def scrape_vk_mobile(url):
         owner_id = ai_match.group(1)
         target_url = f"https://m.vk.com/audio{owner_id}"
     else:
-        # Если пришла уже готовая query-ссылка
-        if "act=audio_playlist" in url:
-            target_url = url.replace('vk.com', 'm.vk.com') if 'm.vk.com' not in url else url
+        # Если пришла просто ссылка на аудио со всякими параметрами, пробуем превратить в мобильную
+        if "audio" in url:
+            target_url = re.sub(r'vk\.(?:com|ru)', 'm.vk.com', url)
         else:
             print("[!] Не удалось распознать формат ссылки.")
             return
@@ -68,8 +71,6 @@ def scrape_vk_mobile(url):
         
         if not items:
             print("[!] Треки не найдены. Возможно, страница пуста или ВК заблокировал запрос.")
-            # debug
-            # with open("vk_error.html", "w", encoding="utf-8") as f: f.write(response.text)
             return
 
         print(f"[*] Найдено треков: {len(items)}")
