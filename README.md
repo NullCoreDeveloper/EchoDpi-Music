@@ -1,7 +1,7 @@
 <div align="center">
   <img src="assets/Echo_github.png" alt="EchoDpi Music Logo" width="140"/>
 
-  <h1>EchoDpi Music ![visitors](https://visitor-badge.laobi.icu/badge?page_id=kiktor12358.EchoDpi-Music) </h1>
+  <h1>EchoDpi Music</h1> ![visitors](https://visitor-badge.laobi.icu/badge?page_id=kiktor12358.EchoDpi-Music)
 
   <p><strong>Форк проекта <a href="https://github.com/iad1tya/Echo-Music">Echo Music</a> с интегрированным механизмом обхода DPI (замедления и блокировок YouTube Music).</strong></p>
 </div>
