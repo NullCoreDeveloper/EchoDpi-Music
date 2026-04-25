@@ -93,7 +93,7 @@ class MusicDatabase(
         SortedSongAlbumMap::class,
         PlaylistSongMapPreview::class,
     ],
-    version = 27,
+    version = 28,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)
@@ -109,7 +109,7 @@ abstract class InternalDatabase : RoomDatabase() {
                 delegate =
                 Room
                     .databaseBuilder(context, InternalDatabase::class.java, DB_NAME)
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_26, MIGRATION_25_26, MIGRATION_26_27)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_26, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28)
                     // Safety net: any version gap not covered by explicit migrations falls
                     // back to a fresh database instead of crashing the app.
                     .fallbackToDestructiveMigration(dropAllTables = true)
@@ -549,6 +549,35 @@ val MIGRATION_26_27 =
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL("ALTER TABLE song ADD COLUMN playbackSource INTEGER NOT NULL DEFAULT 0")
             db.execSQL("ALTER TABLE lyrics ADD COLUMN provider TEXT NOT NULL DEFAULT 'Unknown'")
+        }
+    }
+
+val MIGRATION_27_28 =
+    object : Migration(27, 28) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // New song columns added in upstream v4.2.2
+            db.execSQL("ALTER TABLE song ADD COLUMN libraryAddToken TEXT DEFAULT NULL")
+            db.execSQL("ALTER TABLE song ADD COLUMN libraryRemoveToken TEXT DEFAULT NULL")
+            db.execSQL("ALTER TABLE song ADD COLUMN romanizeLyrics INTEGER NOT NULL DEFAULT 1")
+            db.execSQL("ALTER TABLE song ADD COLUMN isDownloaded INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE song ADD COLUMN isUploaded INTEGER NOT NULL DEFAULT 0")
+            // New account table for multi-account support
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `account` (
+                    `id` TEXT NOT NULL,
+                    `name` TEXT NOT NULL,
+                    `email` TEXT NOT NULL,
+                    `channelHandle` TEXT NOT NULL,
+                    `thumbnailUrl` TEXT,
+                    `innerTubeCookie` TEXT NOT NULL,
+                    `visitorData` TEXT NOT NULL,
+                    `dataSyncId` TEXT NOT NULL,
+                    `isActive` INTEGER NOT NULL DEFAULT 0,
+                    `createdAt` INTEGER NOT NULL,
+                    `lastUsedAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`)
+                )
+            """.trimIndent())
         }
     }
 
