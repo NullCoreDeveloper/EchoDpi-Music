@@ -47,7 +47,7 @@ nanojson = "1.9"
 javaWebSocket = "1.4.1"
 spotbugs = "4.7.1"
 autolink = "0.10.0"
-protobuf = "3.11.0"
+protobuf = "4.34.1"
 cache2k = "2.6.1.Final"
 rhino = "1.7.13"
 
@@ -150,7 +150,7 @@ nanojson = { module = "com.grack:nanojson", version.ref = "nanojson" }
 java-websocket = { module = "org.java-websocket:Java-WebSocket", version.ref = "javaWebSocket" }
 spotbugs-annotations = { module = "com.github.spotbugs:spotbugs-annotations", version.ref = "spotbugs" }
 autolink = { module = "org.nibor.autolink:autolink", version.ref = "autolink" }
-protobuf-java = { module = "com.google.protobuf:protobuf-java", version.ref = "protobuf" }
+protobuf-javalite = { module = "com.google.protobuf:protobuf-javalite", version.ref = "protobuf" }
 cache2k-api = { module = "org.cache2k:cache2k-api", version.ref = "cache2k" }
 cache2k-core = { module = "org.cache2k:cache2k-core", version.ref = "cache2k" }
 rhino = { module = "org.mozilla:rhino", version.ref = "rhino" }

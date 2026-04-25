@@ -264,7 +264,7 @@ dependencies {
     implementation(libs.ktor.client.encoding)
     implementation(libs.ktor.serialization.json)
 
-    implementation("com.google.protobuf:protobuf-javalite:4.34.1")
+    implementation(libs.protobuf.javalite)
 
     coreLibraryDesugaring(libs.desugaring)
 

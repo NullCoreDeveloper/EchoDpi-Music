@@ -37,7 +37,7 @@ dependencies {
     implementation(libs.java.websocket)
     implementation(libs.spotbugs.annotations)
     implementation(libs.autolink)
-    implementation(libs.protobuf.java)
+    implementation(libs.protobuf.javalite)
     implementation(libs.apache.lang3)
     implementation(libs.json)
     implementation(libs.cache2k.api)
