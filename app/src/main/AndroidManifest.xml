@@ -49,7 +49,7 @@
         android:allowBackup="true"
         android:appCategory="audio"
         android:hardwareAccelerated="true"
-        android:banner="@mipmap/tv_banner"
+        android:banner="@mipmap/ic_launcher"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:networkSecurityConfig="@xml/network_security_config"
         android:enableOnBackInvokedCallback="true"
@@ -195,6 +195,11 @@
             android:theme="@style/Theme.Echo"
             android:process=":crash" />
 
+        <activity
+            android:name=".ui.screens.settings.PoTokenExtractionActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Echo" />
+
         <provider
             android:name="iad1tya.echo.music.dpi.DensityScaler"
             android:authorities="${applicationId}.densityscaler"
@@ -250,6 +255,10 @@
                 <action android:name="android.intent.action.MEDIA_BUTTON" />
             </intent-filter>
         </receiver>
+
+        <receiver
+            android:name=".listentogether.ListenTogetherActionReceiver"
+            android:exported="false" />
         
         <receiver
             android:name=".widget.MusicWidgetProvider"

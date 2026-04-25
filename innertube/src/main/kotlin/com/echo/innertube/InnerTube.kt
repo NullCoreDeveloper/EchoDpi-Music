@@ -60,6 +60,24 @@ class InnerTube {
     private fun createClient() = HttpClient(OkHttp) {
         expectSuccess = true
 
+        engine {
+            config {
+                dns(CloudflareDnsResolver)
+                YouTube.customClientBuilder?.invoke(this)
+            }
+
+            proxy = this@InnerTube.proxy
+            proxyAuth?.let {
+                config {
+                    proxyAuthenticator { _, response ->
+                        response.request.newBuilder()
+                            .header("Proxy-Authorization", proxyAuth!!)
+                            .build()
+                    }
+                }
+            }
+        }
+
         install(ContentNegotiation) {
             json(Json {
                 ignoreUnknownKeys = true
@@ -72,22 +90,6 @@ class InnerTube {
             gzip(0.9F)
             deflate(0.8F)
         }
-
-        proxy?.let {
-            engine {
-                proxy = this@InnerTube.proxy
-                proxyAuth?.let {
-                    config {
-                        YouTube.customClientBuilder?.invoke(this)
-                        proxyAuthenticator { _, response ->
-                            response.request.newBuilder()
-                                .header("Proxy-Authorization", proxyAuth!!)
-                                .build()
-                        }
-                    }
-                } ?: config { YouTube.customClientBuilder?.invoke(this) }
-            }
-        } ?: engine { config { YouTube.customClientBuilder?.invoke(this) } }
 
         defaultRequest {
             url(YouTubeClient.API_URL_YOUTUBE_MUSIC)

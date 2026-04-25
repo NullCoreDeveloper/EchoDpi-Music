@@ -142,7 +142,6 @@ inline fun ListItem(
         modifier = modifier
             .height(ListItemHeight)
             .padding(horizontal = 8.dp)
-            .then(if (isActive) Modifier.clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.secondaryContainer) else Modifier)
     ) {
         Box(Modifier.padding(6.dp), contentAlignment = Alignment.Center) { thumbnailContent() }
         Column(Modifier.weight(1f).padding(horizontal = 6.dp)) {
@@ -161,6 +160,7 @@ fun ListItem(
     modifier: Modifier = Modifier,
     title: String,
     subtitle: String?,
+    subtitleColor: Color = MaterialTheme.colorScheme.secondary,
     badges: @Composable RowScope.() -> Unit = {},
     thumbnailContent: @Composable () -> Unit,
     trailingContent: @Composable RowScope.() -> Unit = {},
@@ -172,7 +172,7 @@ fun ListItem(
     subtitle = {
         badges()
         if (!subtitle.isNullOrEmpty()) {
-            Text(text = subtitle, color = MaterialTheme.colorScheme.secondary, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(text = subtitle, color = subtitleColor, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     },
     thumbnailContent = thumbnailContent,
@@ -266,6 +266,7 @@ fun SongListItem(
     song: Song,
     modifier: Modifier = Modifier,
     albumIndex: Int? = null,
+    subtitleColor: Color = MaterialTheme.colorScheme.secondary,
     showLikedIcon: Boolean = true,
     showInLibraryIcon: Boolean = false,
     showDownloadIcon: Boolean = true,
@@ -301,6 +302,7 @@ fun SongListItem(
                 makeTimeString(song.song.duration * 1000L),
                 if (song.song.playbackSource == 2) "[YT]" else null
             ),
+            subtitleColor = subtitleColor,
             badges = badges,
             thumbnailContent = {
                 ItemThumbnail(
@@ -786,6 +788,7 @@ fun YouTubeListItem(
     item: YTItem,
     modifier: Modifier = Modifier,
     albumIndex: Int? = null,
+    subtitleColor: Color = MaterialTheme.colorScheme.secondary,
     isSelected: Boolean = false,
     isActive: Boolean = false,
     isPlaying: Boolean = false,
@@ -827,6 +830,7 @@ fun YouTubeListItem(
                 is PlaylistItem -> joinByBullet(item.author?.name, item.songCountText)
                 is EpisodeItem, is PodcastItem -> null
             },
+            subtitleColor = subtitleColor,
             badges = badges,
             thumbnailContent = {
                 ItemThumbnail(
@@ -1099,22 +1103,6 @@ fun ItemThumbnail(
             }
         }
 
-        if (isSelected) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .zIndex(1f)
-                    .clip(shape)
-                    .background(Color.Black.copy(alpha = 0.5f))
-            ) {
-                Icon(
-                    painter = painterResource(R.drawable.done),
-                    contentDescription = null
-                )
-            }
-        }
-
         PlayingIndicatorBox(
             isActive = isActive,
             playWhenReady = isPlaying,
@@ -1129,6 +1117,30 @@ fun ItemThumbnail(
                     shape = shape
                 )
         )
+
+        AnimatedVisibility(
+            visible = isSelected,
+            enter = fadeIn(tween(180)),
+            exit = fadeOut(tween(120)),
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(6.dp)
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(18.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary)
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.check),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(12.dp)
+                )
+            }
+        }
     }
 }
 

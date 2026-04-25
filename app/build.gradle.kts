@@ -4,6 +4,7 @@ import java.util.Properties
 plugins {
     id("com.android.application")
     kotlin("android")
+    id("com.google.protobuf") version "0.9.4"
     alias(libs.plugins.hilt)
     alias(libs.plugins.kotlin.ksp)
     alias(libs.plugins.compose.compiler)
@@ -23,13 +24,15 @@ android {
         applicationId = "iad1tya.echo.music.dpi"
         minSdk = 26
         targetSdk = 36
-        versionCode = 103
-        versionName = "1.0.2"
+        versionCode = 421
+        versionName = "4.2.2-dpi"
 
         val lastFmKey = localProperties.getProperty("LASTFM_API_KEY") ?: System.getenv("LASTFM_API_KEY") ?: ""
         val lastFmSecret = localProperties.getProperty("LASTFM_SECRET") ?: System.getenv("LASTFM_SECRET") ?: ""
+        val canvasBearerToken = localProperties.getProperty("CANVAS_BEARER_TOKEN") ?: System.getenv("CANVAS_BEARER_TOKEN") ?: ""
         buildConfigField("String", "LASTFM_API_KEY", "\"$lastFmKey\"")
         buildConfigField("String", "LASTFM_SECRET", "\"$lastFmSecret\"")
+        buildConfigField("String", "CANVAS_BEARER_TOKEN", "\"$canvasBearerToken\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -159,6 +162,22 @@ android {
     }
 }
 
+protobuf {
+    protoc {
+        artifact = "com.google.protobuf:protoc:4.34.1"
+    }
+
+    generateProtoTasks {
+        all().configureEach {
+            builtins {
+                create("java") {
+                    option("lite")
+                }
+            }
+        }
+    }
+}
+
 ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
 }
@@ -223,6 +242,7 @@ dependencies {
 
     implementation(libs.room.runtime)
     implementation(libs.kuromoji.ipadic)
+    implementation("com.anyascii:anyascii:0.3.3")
     ksp(libs.room.compiler)
     implementation(libs.room.ktx)
 
@@ -243,6 +263,8 @@ dependencies {
     implementation(libs.ktor.client.content.negotiation)
     implementation(libs.ktor.client.encoding)
     implementation(libs.ktor.serialization.json)
+
+    implementation("com.google.protobuf:protobuf-javalite:4.34.1")
 
     coreLibraryDesugaring(libs.desugaring)
 

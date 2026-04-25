@@ -1,7 +1,9 @@
 package iad1tya.echo.music.ui.screens.settings
 
+import android.Manifest
 import android.os.Build
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,6 +30,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.ui.Alignment
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -53,6 +56,7 @@ import androidx.compose.material.icons.rounded.Bluetooth
 import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material.icons.rounded.Storage
 import iad1tya.echo.music.R
 import iad1tya.echo.music.constants.DisableScreenshotKey
@@ -61,7 +65,6 @@ import iad1tya.echo.music.constants.PauseSearchHistoryKey
 import iad1tya.echo.music.ui.component.DefaultDialog
 import iad1tya.echo.music.ui.component.IconButton
 import iad1tya.echo.music.ui.component.PreferenceEntry
-import iad1tya.echo.music.ui.component.PreferenceGroupTitle
 import iad1tya.echo.music.ui.component.SwitchPreference
 import iad1tya.echo.music.ui.utils.backToMain
 import iad1tya.echo.music.utils.rememberPreference
@@ -124,6 +127,9 @@ fun PrivacySettings(
     var showClearSearchHistoryDialog by remember {
         mutableStateOf(false)
     }
+    var showHistorySection by remember { mutableStateOf(false) }
+    var showPermissionsSection by remember { mutableStateOf(false) }
+    var showMiscSection by remember { mutableStateOf(false) }
 
     if (showClearSearchHistoryDialog) {
         DefaultDialog(
@@ -169,41 +175,60 @@ fun PrivacySettings(
             )
         )
 
-        PreferenceGroupTitle(
-            title = stringResource(R.string.listen_history)
-        )
-
-        SwitchPreference(
-            title = { Text(stringResource(R.string.pause_listen_history)) },
+        PreferenceEntry(
+            title = { Text("History") },
             icon = { Icon(painterResource(R.drawable.history), null) },
-            checked = pauseListenHistory,
-            onCheckedChange = onPauseListenHistoryChange,
+            trailingContent = {
+                Icon(
+                    painter = painterResource(if (showHistorySection) R.drawable.expand_less else R.drawable.expand_more),
+                    contentDescription = null
+                )
+            },
+            onClick = { showHistorySection = !showHistorySection }
         )
+
+        AnimatedVisibility(visible = showHistorySection) {
+            Column {
+                SwitchPreference(
+                    title = { Text(stringResource(R.string.pause_listen_history)) },
+                    icon = { Icon(painterResource(R.drawable.history), null) },
+                    checked = pauseListenHistory,
+                    onCheckedChange = onPauseListenHistoryChange,
+                )
+                PreferenceEntry(
+                    title = { Text(stringResource(R.string.clear_listen_history)) },
+                    icon = { Icon(painterResource(R.drawable.delete_history), null) },
+                    onClick = { showClearListenHistoryDialog = true },
+                )
+
+                SwitchPreference(
+                    title = { Text(stringResource(R.string.pause_search_history)) },
+                    icon = { Icon(painterResource(R.drawable.search_off), null) },
+                    checked = pauseSearchHistory,
+                    onCheckedChange = onPauseSearchHistoryChange,
+                )
+                PreferenceEntry(
+                    title = { Text(stringResource(R.string.clear_search_history)) },
+                    icon = { Icon(painterResource(R.drawable.clear_all), null) },
+                    onClick = { showClearSearchHistoryDialog = true },
+                )
+            }
+        }
+
         PreferenceEntry(
-            title = { Text(stringResource(R.string.clear_listen_history)) },
-            icon = { Icon(painterResource(R.drawable.delete_history), null) },
-            onClick = { showClearListenHistoryDialog = true },
+            title = { Text("Permissions") },
+            icon = { Icon(painterResource(R.drawable.settings_outlined), null) },
+            trailingContent = {
+                Icon(
+                    painter = painterResource(if (showPermissionsSection) R.drawable.expand_less else R.drawable.expand_more),
+                    contentDescription = null
+                )
+            },
+            onClick = { showPermissionsSection = !showPermissionsSection }
         )
 
-        PreferenceGroupTitle(
-            title = stringResource(R.string.search_history)
-        )
-
-        SwitchPreference(
-            title = { Text(stringResource(R.string.pause_search_history)) },
-            icon = { Icon(painterResource(R.drawable.search_off), null) },
-            checked = pauseSearchHistory,
-            onCheckedChange = onPauseSearchHistoryChange,
-        )
-        PreferenceEntry(
-            title = { Text(stringResource(R.string.clear_search_history)) },
-            icon = { Icon(painterResource(R.drawable.clear_all), null) },
-            onClick = { showClearSearchHistoryDialog = true },
-        )
-
-        PreferenceGroupTitle(
-            title = "Permissions"
-        )
+        AnimatedVisibility(visible = showPermissionsSection) {
+            Column {
 
         val context = androidx.compose.ui.platform.LocalContext.current
         
@@ -255,12 +280,21 @@ fun PrivacySettings(
                     androidx.compose.material.icons.Icons.Rounded.Storage
                 ))
             }
-             list.add(PermissionInfo(
-                android.Manifest.permission.ACCESS_FINE_LOCATION,
-                "Location",
-                "Used to discover Cast devices on your network.",
-                androidx.compose.material.icons.Icons.Rounded.LocationOn
-            ))
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                list.add(PermissionInfo(
+                    Manifest.permission.NEARBY_WIFI_DEVICES,
+                    "Nearby devices",
+                    "Used to discover Cast devices on your Wi-Fi network.",
+                    androidx.compose.material.icons.Icons.Rounded.Wifi
+                ))
+            } else {
+                list.add(PermissionInfo(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    "Location",
+                    "Used to discover Cast devices on your network.",
+                    androidx.compose.material.icons.Icons.Rounded.LocationOn
+                ))
+            }
             
             list
         }
@@ -276,8 +310,9 @@ fun PrivacySettings(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 4.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
                 ),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
                 shape = RoundedCornerShape(20.dp),
                 onClick = {
                     val intent = android.content.Intent(
@@ -352,18 +387,32 @@ fun PrivacySettings(
                 }
             }
         }
+            }
+        }
 
-        PreferenceGroupTitle(
-            title = stringResource(R.string.misc),
+        PreferenceEntry(
+            title = { Text(stringResource(R.string.misc)) },
+            icon = { Icon(painterResource(R.drawable.tune), null) },
+            trailingContent = {
+                Icon(
+                    painter = painterResource(if (showMiscSection) R.drawable.expand_less else R.drawable.expand_more),
+                    contentDescription = null
+                )
+            },
+            onClick = { showMiscSection = !showMiscSection }
         )
 
-        SwitchPreference(
-            title = { Text(stringResource(R.string.disable_screenshot)) },
-            description = stringResource(R.string.disable_screenshot_desc),
-            icon = { Icon(painterResource(R.drawable.screenshot), null) },
-            checked = disableScreenshot,
-            onCheckedChange = onDisableScreenshotChange,
-        )
+        AnimatedVisibility(visible = showMiscSection) {
+            Column {
+                SwitchPreference(
+                    title = { Text(stringResource(R.string.disable_screenshot)) },
+                    description = stringResource(R.string.disable_screenshot_desc),
+                    icon = { Icon(painterResource(R.drawable.screenshot), null) },
+                    checked = disableScreenshot,
+                    onCheckedChange = onDisableScreenshotChange,
+                )
+            }
+        }
     }
 
     Box {
@@ -389,8 +438,8 @@ fun PrivacySettings(
                 .background(
                     brush = Brush.verticalGradient(
                         colors = listOf(
-                            MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
-                            MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.88f),
                             Color.Transparent
                         )
                     )

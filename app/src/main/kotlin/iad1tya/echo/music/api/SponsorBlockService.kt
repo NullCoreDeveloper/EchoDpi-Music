@@ -1,5 +1,6 @@
 package iad1tya.echo.music.api
 
+import com.echo.innertube.CloudflareDnsResolver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -9,6 +10,7 @@ import java.util.concurrent.TimeUnit
 
 object SponsorBlockService {
     private val client = iad1tya.echo.music.dpi.core.DpiConfig.applyTo(OkHttpClient.Builder())
+        .dns(CloudflareDnsResolver)
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(10, TimeUnit.SECONDS)
         .build()

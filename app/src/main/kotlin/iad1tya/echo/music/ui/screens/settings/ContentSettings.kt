@@ -109,6 +109,11 @@ fun ContentSettings(
     val (hideExplicit, onHideExplicitChange) = rememberPreference(key = HideExplicitKey, defaultValue = false)
     val (hideVideoSongs, onHideVideoSongsChange) = rememberPreference(key = HideVideoSongsKey, defaultValue = false)
     val (hideYoutubeShorts, onHideYoutubeShortsChange) = rememberPreference(key = HideYoutubeShortsKey, defaultValue = false)
+    val (playerStreamClient, onPlayerStreamClientChange) = rememberEnumPreference(
+        key = PlayerStreamClientKey,
+        defaultValue = PlayerStreamClient.ANDROID_VR
+    )
+    val (webClientPoTokenEnabled) = rememberPreference(key = WebClientPoTokenEnabledKey, defaultValue = false)
     val (proxyEnabled, onProxyEnabledChange) = rememberPreference(key = ProxyEnabledKey, defaultValue = false)
     val (proxyType, onProxyTypeChange) = rememberEnumPreference(key = ProxyTypeKey, defaultValue = Proxy.Type.HTTP)
     val (proxyUrl, onProxyUrlChange) = rememberPreference(key = ProxyUrlKey, defaultValue = "host:port")
@@ -120,6 +125,13 @@ fun ContentSettings(
     val (enableSimpMusic, onEnableSimpMusicChange) = rememberPreference(key = EnableSimpMusicKey, defaultValue = true)
     val (enableBetterLyrics, onEnableBetterLyricsChange) = rememberPreference(key = EnableBetterLyricsKey, defaultValue = true)
     val (enableLyricsPlus, onEnableLyricsPlusChange) = rememberPreference(key = EnableLyricsPlus, defaultValue = true)
+    val (lyricsRomanizeJapanese, onLyricsRomanizeJapaneseChange) = rememberPreference(LyricsRomanizeJapaneseKey, defaultValue = true)
+    val (lyricsRomanizeKorean, onLyricsRomanizeKoreanChange) = rememberPreference(LyricsRomanizeKoreanKey, defaultValue = true)
+    val (lyricsRomanizeChinese, onLyricsRomanizeChineseChange) = rememberPreference(LyricsRomanizeChineseKey, defaultValue = true)
+    val (lyricsRomanizeHindi, onLyricsRomanizeHindiChange) = rememberPreference(LyricsRomanizeHindiKey, defaultValue = true)
+    val (lyricsRomanizeOtherLanguages, onLyricsRomanizeOtherLanguagesChange) = rememberPreference(LyricsRomanizeOtherLanguagesKey, defaultValue = true)
+    val (preloadQueueLyricsEnabled, onPreloadQueueLyricsEnabledChange) = rememberPreference(PreloadQueueLyricsEnabledKey, defaultValue = true)
+    val (queueLyricsPreloadCount, onQueueLyricsPreloadCountChange) = rememberPreference(QueueLyricsPreloadCountKey, defaultValue = 1)
     val (preferredProvider, onPreferredProviderChange) =
         rememberEnumPreference(
             key = PreferredLyricsProviderKey,
@@ -131,6 +143,12 @@ fun ContentSettings(
     var showProxyConfigurationDialog by rememberSaveable {
         mutableStateOf(false)
     }
+    var showContentPlaybackSection by rememberSaveable { mutableStateOf(false) }
+    var showLanguageNetworkSection by rememberSaveable { mutableStateOf(false) }
+    var showLyricsOptions by rememberSaveable {
+        mutableStateOf(false)
+    }
+    var showMiscContentSection by rememberSaveable { mutableStateOf(false) }
 
     if (showProxyConfigurationDialog) {
         var expandedDropdown by remember { mutableStateOf(false) }
@@ -355,7 +373,20 @@ fun ContentSettings(
             )
         )
         
-        PreferenceGroupTitle(title = stringResource(R.string.general))
+        PreferenceEntry(
+            title = { Text("Content & Playback") },
+            icon = { Icon(painterResource(R.drawable.play), null) },
+            trailingContent = {
+                Icon(
+                    painter = painterResource(if (showContentPlaybackSection) R.drawable.expand_less else R.drawable.expand_more),
+                    contentDescription = null,
+                )
+            },
+            onClick = { showContentPlaybackSection = !showContentPlaybackSection }
+        )
+
+        AnimatedVisibility(visible = showContentPlaybackSection) {
+            Column {
         ListPreference(
             title = { Text(stringResource(R.string.content_language)) },
             icon = { Icon(painterResource(R.drawable.language), null) },
@@ -422,7 +453,42 @@ fun ContentSettings(
             onCheckedChange = onHideYoutubeShortsChange,
         )
 
-        PreferenceGroupTitle(title = stringResource(R.string.app_language))
+        ListPreference(
+            title = { Text(stringResource(R.string.preferred_playback_client)) },
+            icon = { Icon(painterResource(R.drawable.play), null) },
+            selectedValue = playerStreamClient,
+            values = listOf(
+                PlayerStreamClient.ANDROID_VR,
+                PlayerStreamClient.WEB_REMIX,
+                PlayerStreamClient.IOS,
+                PlayerStreamClient.TVHTML5,
+                PlayerStreamClient.ANDROID,
+            ),
+            valueText = {
+                when (it) {
+                    PlayerStreamClient.ANDROID_VR -> "Android VR"
+                    PlayerStreamClient.WEB_REMIX -> "Web Remix"
+                    PlayerStreamClient.IOS -> "iOS"
+                    PlayerStreamClient.TVHTML5 -> "TVHTML5"
+                    PlayerStreamClient.ANDROID -> "Android"
+                }
+            },
+            onValueSelected = onPlayerStreamClientChange,
+        )
+
+        PreferenceEntry(
+            title = { Text(stringResource(R.string.po_token_generation)) },
+            description = if (webClientPoTokenEnabled) {
+                stringResource(R.string.web_client_po_token_enabled)
+            } else {
+                stringResource(R.string.web_client_po_token_disabled)
+            },
+            icon = { Icon(painterResource(R.drawable.token), null) },
+            onClick = { navController.navigate("settings/content/po_token") },
+        )
+            }
+        }
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             PreferenceEntry(
                 title = { Text(stringResource(R.string.app_language)) },
@@ -460,7 +526,6 @@ fun ContentSettings(
             )
         }
 
-        PreferenceGroupTitle(title = stringResource(R.string.proxy))
         SwitchPreference(
             title = { Text(stringResource(R.string.enable_proxy)) },
             icon = { Icon(painterResource(R.drawable.wifi_proxy), null) },
@@ -475,7 +540,6 @@ fun ContentSettings(
             )
         }
 
-        PreferenceGroupTitle(title = stringResource(R.string.sponsor_block))
         val creditText = androidx.compose.ui.text.buildAnnotatedString {
             append("Built and maintained by ")
             pushStringAnnotation(tag = "URL", annotation = "https://ajay.app/")
@@ -519,72 +583,148 @@ fun ContentSettings(
             }
         )
 
-
-
-        PreferenceGroupTitle(title = stringResource(R.string.lyrics))
-        SwitchPreference(
-            title = { Text(stringResource(R.string.enable_lrclib)) },
+        PreferenceEntry(
+            title = { Text(stringResource(R.string.lyrics)) },
             icon = { Icon(painterResource(R.drawable.lyrics), null) },
-            checked = enableLrclib,
-            onCheckedChange = onEnableLrclibChange,
-        )
-        SwitchPreference(
-            title = { Text("Enable SimpMusic") },
-            icon = { Icon(painterResource(R.drawable.lyrics), null) },
-            checked = enableSimpMusic,
-            onCheckedChange = onEnableSimpMusicChange,
-        )
-        SwitchPreference(
-            title = { Text(stringResource(R.string.enable_kugou)) },
-            icon = { Icon(painterResource(R.drawable.lyrics), null) },
-            checked = enableKugou,
-            onCheckedChange = onEnableKugouChange,
-        )
-        SwitchPreference(
-            title = { Text("Enable BetterLyrics") },
-            icon = { Icon(painterResource(R.drawable.lyrics), null) },
-            checked = enableBetterLyrics,
-            onCheckedChange = onEnableBetterLyricsChange,
-        )
-        SwitchPreference(
-            title = { Text("Enable LyricsPlus") },
-            icon = { Icon(painterResource(R.drawable.lyrics), null) },
-            checked = enableLyricsPlus,
-            onCheckedChange = onEnableLyricsPlusChange,
-        )
-
-        ListPreference(
-            title = { Text(stringResource(R.string.set_first_lyrics_provider)) },
-            icon = { Icon(painterResource(R.drawable.lyrics), null) },
-            selectedValue = preferredProvider,
-            values = listOf(
-                PreferredLyricsProvider.LRCLIB,
-                PreferredLyricsProvider.SIMPMUSIC,
-                PreferredLyricsProvider.KUGOU,
-                PreferredLyricsProvider.BETTERLYRICS,
-                PreferredLyricsProvider.LYRICSPLUS,
-            ),
-            valueText = {
-                when (it) {
-                    PreferredLyricsProvider.LRCLIB -> "LrcLib"
-                    PreferredLyricsProvider.SIMPMUSIC -> "SimpMusic"
-                    PreferredLyricsProvider.KUGOU -> "KuGou"
-                    PreferredLyricsProvider.BETTERLYRICS -> "BetterLyrics"
-                    PreferredLyricsProvider.LYRICSPLUS -> "LyricsPlus"
-                }
+            trailingContent = {
+                Icon(
+                    painter = painterResource(
+                        if (showLyricsOptions) R.drawable.expand_less else R.drawable.expand_more
+                    ),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             },
-            onValueSelected = onPreferredProviderChange,
+            onClick = { showLyricsOptions = !showLyricsOptions }
         )
+
+        AnimatedVisibility(visible = showLyricsOptions) {
+            Column {
+                SwitchPreference(
+                    title = { Text(stringResource(R.string.enable_lrclib)) },
+                    icon = { Icon(painterResource(R.drawable.lyrics), null) },
+                    checked = enableLrclib,
+                    onCheckedChange = onEnableLrclibChange,
+                )
+                SwitchPreference(
+                    title = { Text(stringResource(R.string.enable_simpmusic_lyrics)) },
+                    icon = { Icon(painterResource(R.drawable.lyrics), null) },
+                    checked = enableSimpMusic,
+                    onCheckedChange = onEnableSimpMusicChange,
+                )
+                SwitchPreference(
+                    title = { Text(stringResource(R.string.enable_kugou)) },
+                    icon = { Icon(painterResource(R.drawable.lyrics), null) },
+                    checked = enableKugou,
+                    onCheckedChange = onEnableKugouChange,
+                )
+                SwitchPreference(
+                    title = { Text("Enable BetterLyrics") },
+                    icon = { Icon(painterResource(R.drawable.lyrics), null) },
+                    checked = enableBetterLyrics,
+                    onCheckedChange = onEnableBetterLyricsChange,
+                )
+                SwitchPreference(
+                    title = { Text("Enable LyricsPlus") },
+                    icon = { Icon(painterResource(R.drawable.lyrics), null) },
+                    checked = enableLyricsPlus,
+                    onCheckedChange = onEnableLyricsPlusChange,
+                )
+
+                ListPreference(
+                    title = { Text(stringResource(R.string.set_first_lyrics_provider)) },
+                    icon = { Icon(painterResource(R.drawable.lyrics), null) },
+                    selectedValue = preferredProvider,
+                    values = listOf(
+                        PreferredLyricsProvider.LRCLIB,
+                        PreferredLyricsProvider.SIMPMUSIC,
+                        PreferredLyricsProvider.KUGOU,
+                        PreferredLyricsProvider.BETTERLYRICS,
+                        PreferredLyricsProvider.LYRICSPLUS,
+                    ),
+                    valueText = {
+                        when (it) {
+                            PreferredLyricsProvider.LRCLIB -> "LrcLib"
+                            PreferredLyricsProvider.SIMPMUSIC -> "SimpMusic"
+                            PreferredLyricsProvider.KUGOU -> "KuGou"
+                            PreferredLyricsProvider.BETTERLYRICS -> "BetterLyrics"
+                            PreferredLyricsProvider.LYRICSPLUS -> "LyricsPlus"
+                        }
+                    },
+                    onValueSelected = onPreferredProviderChange,
+                )
+
+                SwitchPreference(
+                    title = { Text(stringResource(R.string.lyrics_romanize_japanese)) },
+                    icon = { Icon(painterResource(R.drawable.lyrics), null) },
+                    checked = lyricsRomanizeJapanese,
+                    onCheckedChange = onLyricsRomanizeJapaneseChange,
+                )
+                SwitchPreference(
+                    title = { Text(stringResource(R.string.lyrics_romanize_korean)) },
+                    icon = { Icon(painterResource(R.drawable.lyrics), null) },
+                    checked = lyricsRomanizeKorean,
+                    onCheckedChange = onLyricsRomanizeKoreanChange,
+                )
+                SwitchPreference(
+                    title = { Text(stringResource(R.string.lyrics_romanize_chinese)) },
+                    icon = { Icon(painterResource(R.drawable.lyrics), null) },
+                    checked = lyricsRomanizeChinese,
+                    onCheckedChange = onLyricsRomanizeChineseChange,
+                )
+                SwitchPreference(
+                    title = { Text(stringResource(R.string.lyrics_romanize_hindi)) },
+                    icon = { Icon(painterResource(R.drawable.lyrics), null) },
+                    checked = lyricsRomanizeHindi,
+                    onCheckedChange = onLyricsRomanizeHindiChange,
+                )
+                SwitchPreference(
+                    title = { Text(stringResource(R.string.lyrics_romanize_other_languages)) },
+                    icon = { Icon(painterResource(R.drawable.lyrics), null) },
+                    checked = lyricsRomanizeOtherLanguages,
+                    onCheckedChange = onLyricsRomanizeOtherLanguagesChange,
+                )
+                SwitchPreference(
+                    title = { Text(stringResource(R.string.preload_queue_lyrics)) },
+                    icon = { Icon(painterResource(R.drawable.lyrics), null) },
+                    checked = preloadQueueLyricsEnabled,
+                    onCheckedChange = onPreloadQueueLyricsEnabledChange,
+                )
+                if (preloadQueueLyricsEnabled) {
+                    ListPreference(
+                        title = { Text(stringResource(R.string.queue_lyrics_preload_count)) },
+                        icon = { Icon(painterResource(R.drawable.lyrics), null) },
+                        selectedValue = queueLyricsPreloadCount,
+                        values = (0..10).toList(),
+                        valueText = { if (it == 0) "Off" else it.toString() },
+                        onValueSelected = onQueueLyricsPreloadCountChange,
+                    )
+                }
+
+                PreferenceEntry(
+                    title = { Text(stringResource(R.string.lyrics_romanization)) },
+                    icon = { Icon(painterResource(R.drawable.language_korean_latin), null) },
+                    onClick = { navController.navigate("settings/content/romanization") }
+                )
+            }
+        }
+
+
 
         PreferenceEntry(
-            title = { Text(stringResource(R.string.lyrics_romanization)) },
-            icon = { Icon(painterResource(R.drawable.language_korean_latin), null) },
-            onClick = { navController.navigate("settings/content/romanization") }
+            title = { Text(stringResource(R.string.misc)) },
+            icon = { Icon(painterResource(R.drawable.tune), null) },
+            trailingContent = {
+                Icon(
+                    painter = painterResource(if (showMiscContentSection) R.drawable.expand_less else R.drawable.expand_more),
+                    contentDescription = null,
+                )
+            },
+            onClick = { showMiscContentSection = !showMiscContentSection }
         )
 
-
-
-        PreferenceGroupTitle(title = stringResource(R.string.misc))
+        AnimatedVisibility(visible = showMiscContentSection) {
+            Column {
         EditTextPreference(
             title = { Text(stringResource(R.string.top_length)) },
             icon = { Icon(painterResource(R.drawable.trending_up), null) },
@@ -605,6 +745,8 @@ fun ContentSettings(
             },
             onValueSelected = onQuickPicksChange,
         )
+            }
+        }
     }
 
     Box {
@@ -630,8 +772,8 @@ fun ContentSettings(
                 .background(
                     brush = Brush.verticalGradient(
                         colors = listOf(
-                            MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
-                            MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.88f),
                             Color.Transparent
                         )
                     )

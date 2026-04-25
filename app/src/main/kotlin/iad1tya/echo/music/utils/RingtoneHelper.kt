@@ -20,8 +20,15 @@ import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.ExportException
 import androidx.media3.transformer.ExportResult
 import androidx.media3.transformer.Transformer
+import com.echo.innertube.CloudflareDnsResolver
 import com.echo.innertube.YouTube
 import iad1tya.echo.music.constants.AudioQuality
+import iad1tya.echo.music.constants.PlayerStreamClient
+import iad1tya.echo.music.constants.PlayerStreamClientKey
+import iad1tya.echo.music.constants.PoTokenGvsKey
+import iad1tya.echo.music.constants.PoTokenPlayerKey
+import iad1tya.echo.music.constants.UseVisitorDataKey
+import iad1tya.echo.music.constants.WebClientPoTokenEnabledKey
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -36,7 +43,18 @@ object RingtoneHelper {
     private const val TAG = "RingtoneHelper"
 
     private val httpClient = iad1tya.echo.music.dpi.core.DpiConfig.applyTo(OkHttpClient.Builder())
+        .dns(CloudflareDnsResolver)
         .proxy(YouTube.proxy)
+        .addInterceptor { chain ->
+            val request = chain.request()
+            val clientParam = request.url.queryParameter("c")
+            val ua = StreamClientUtils.resolveUserAgent(clientParam)
+            val originReferer = StreamClientUtils.resolveOriginReferer(clientParam)
+            val builder = request.newBuilder().header("User-Agent", ua)
+            originReferer.origin?.let { builder.header("Origin", it) }
+            originReferer.referer?.let { builder.header("Referer", it) }
+            chain.proceed(builder.build())
+        }
         .build()
 
     /**
@@ -59,6 +77,13 @@ object RingtoneHelper {
                 videoId = songId,
                 audioQuality = AudioQuality.AUTO,
                 connectivityManager = connectivityManager,
+                preferredStreamClient = context.dataStore[PlayerStreamClientKey]
+                    ?.let { runCatching { PlayerStreamClient.valueOf(it) }.getOrNull() }
+                    ?: PlayerStreamClient.ANDROID_VR,
+                webClientPoTokenEnabled = context.dataStore.get(WebClientPoTokenEnabledKey, false),
+                useVisitorData = context.dataStore.get(UseVisitorDataKey, false),
+                manualGvsPoToken = context.dataStore.get(PoTokenGvsKey),
+                manualPlayerPoToken = context.dataStore.get(PoTokenPlayerKey),
                 databaseDao = null
             ).getOrElse {
                 Log.e(TAG, "Failed to get stream URL: ${it.message}")

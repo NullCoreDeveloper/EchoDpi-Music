@@ -13,18 +13,34 @@ import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.offline.Download
 import androidx.media3.exoplayer.offline.DownloadManager
 import androidx.media3.exoplayer.offline.DownloadNotificationHelper
+import androidx.media3.exoplayer.offline.DownloadService
+import androidx.media3.exoplayer.scheduler.Requirements
+import com.echo.innertube.CloudflareDnsResolver
 import com.echo.innertube.YouTube
 import iad1tya.echo.music.constants.AudioQuality
 import iad1tya.echo.music.constants.AudioQualityKey
+import iad1tya.echo.music.constants.DownloadAutoRetryKey
+import iad1tya.echo.music.constants.DownloadChargingOnlyKey
+import iad1tya.echo.music.constants.DownloadRetryLimitKey
+import iad1tya.echo.music.constants.DownloadWifiOnlyKey
+import iad1tya.echo.music.constants.PlayerStreamClient
+import iad1tya.echo.music.constants.PlayerStreamClientKey
+import iad1tya.echo.music.constants.PoTokenGvsKey
+import iad1tya.echo.music.constants.PoTokenPlayerKey
+import iad1tya.echo.music.constants.UseVisitorDataKey
+import iad1tya.echo.music.constants.WebClientPoTokenEnabledKey
 import iad1tya.echo.music.db.MusicDatabase
 import iad1tya.echo.music.db.entities.FormatEntity
 import iad1tya.echo.music.db.entities.SongEntity
 import iad1tya.echo.music.di.DownloadCache
 import iad1tya.echo.music.di.PlayerCache
+import iad1tya.echo.music.utils.StreamClientUtils
 import iad1tya.echo.music.utils.YTPlayerUtils
+import iad1tya.echo.music.utils.dataStore
 import iad1tya.echo.music.utils.enumPreference
 import iad1tya.echo.music.utils.preference
 import iad1tya.echo.music.utils.dataStore
+import iad1tya.echo.music.utils.get
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
@@ -44,11 +60,14 @@ constructor(
     @DownloadCache val downloadCache: SimpleCache,
     @PlayerCache val playerCache: SimpleCache,
 ) {
+    private val appContext = context
     private val connectivityManager = context.getSystemService<ConnectivityManager>()!!
     private val audioQuality by enumPreference(context, AudioQualityKey, AudioQuality.AUTO)
     private val youtubeVideoFallbackEnabled by preference(context, iad1tya.echo.music.constants.YoutubeVideoFallbackKey, true)
     private val youtubeAllFallbackEnabled by preference(context, iad1tya.echo.music.constants.YoutubeAllFallbackKey, false)
+    private val playerStreamClient by enumPreference(context, PlayerStreamClientKey, PlayerStreamClient.ANDROID_VR)
     private val songUrlCache = HashMap<String, Pair<String, Long>>()
+    private val downloadRetryCount = mutableMapOf<String, Int>()
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val lastDownloadStates = java.util.concurrent.ConcurrentHashMap<String, Int>()
@@ -64,7 +83,18 @@ constructor(
                 .setUpstreamDataSourceFactory(
                     OkHttpDataSource.Factory(
                         iad1tya.echo.music.dpi.core.DpiConfig.applyTo(OkHttpClient.Builder(), context)
+                            .dns(CloudflareDnsResolver)
                             .proxy(YouTube.proxy)
+                            .addInterceptor { chain ->
+                                val request = chain.request()
+                                val clientParam = request.url.queryParameter("c")
+                                val ua = StreamClientUtils.resolveUserAgent(clientParam)
+                                val originReferer = StreamClientUtils.resolveOriginReferer(clientParam)
+                                val builder = request.newBuilder().header("User-Agent", ua)
+                                originReferer.origin?.let { builder.header("Origin", it) }
+                                originReferer.referer?.let { builder.header("Referer", it) }
+                                chain.proceed(builder.build())
+                            }
                             .proxyAuthenticator { _, response ->
                                 YouTube.proxyAuth?.let { auth ->
                                     response.request.newBuilder()
@@ -76,8 +106,12 @@ constructor(
                     ),
                 ),
         ) { dataSpec ->
-            val mediaId = dataSpec.key ?: error("No media id")
-            val length = if (dataSpec.length >= 0) dataSpec.length else 1L
+            val mediaId = dataSpec.key
+                ?: dataSpec.uri.host
+                ?: dataSpec.uri.lastPathSegment
+                ?: dataSpec.uri.toString().removePrefix("echo://")
+            require(mediaId.isNotBlank()) { "No media id" }
+            val length = if (dataSpec.length >= 0) dataSpec.length else 1
 
             val cachedUrl = songUrlCache[mediaId]?.takeIf { it.second > System.currentTimeMillis() }
 
@@ -88,7 +122,11 @@ constructor(
                 return@Factory if (cachedUrl != null) dataSpec.withUri(cachedUrl.first.toUri()) else dataSpec
             }
 
+<<<<<<< HEAD
             cachedUrl?.let {
+=======
+            songUrlCache[mediaId]?.takeIf { it.second > System.currentTimeMillis() }?.let {
+>>>>>>> upstream/main
                 return@Factory dataSpec.withUri(it.first.toUri())
             }
 
@@ -99,7 +137,12 @@ constructor(
                     connectivityManager = connectivityManager,
                     enableFallback = youtubeVideoFallbackEnabled,
                     forceAllFallback = youtubeAllFallbackEnabled,
-                    databaseDao = database
+                    databaseDao = database,
+                    preferredStreamClient = playerStreamClient,
+                    webClientPoTokenEnabled = appContext.dataStore.get(WebClientPoTokenEnabledKey, false),
+                    useVisitorData = appContext.dataStore.get(UseVisitorDataKey, false),
+                    manualGvsPoToken = appContext.dataStore.get(PoTokenGvsKey),
+                    manualPlayerPoToken = appContext.dataStore.get(PoTokenPlayerKey),
                 )
             }.getOrThrow()
             val format = playbackData.format
@@ -146,7 +189,12 @@ constructor(
                 "${it}&range=0-${format.contentLength ?: 10000000}"
             }
 
+<<<<<<< HEAD
             songUrlCache[mediaId] = streamUrl to (System.currentTimeMillis() + playbackData.streamExpiresInSeconds * 1000L)
+=======
+            songUrlCache[mediaId] =
+                streamUrl to (System.currentTimeMillis() + playbackData.streamExpiresInSeconds * 1000L)
+>>>>>>> upstream/main
             dataSpec.withUri(streamUrl.toUri())
         }
 
@@ -214,6 +262,7 @@ constructor(
                             scope.launch {
                                 when (state) {
                                     Download.STATE_COMPLETED -> {
+                                        downloadRetryCount.remove(id)
                                         if (downloadCache.isCached(id, 0L, 1L)) {
                                             database.updateDownloadedInfo(id, true, LocalDateTime.now())
                                         } else {
@@ -221,7 +270,24 @@ constructor(
                                             database.updateDownloadedInfo(id, false, null)
                                         }
                                     }
-                                    Download.STATE_FAILED,
+                                    Download.STATE_FAILED -> {
+                                        database.updateDownloadedInfo(id, false, null)
+
+                                        val prefs = appContext.dataStore.data.first()
+                                        val autoRetry = prefs[DownloadAutoRetryKey] ?: true
+                                        val retryLimit = (prefs[DownloadRetryLimitKey] ?: 2).coerceIn(1, 5)
+                                        val currentAttempt = downloadRetryCount[id] ?: 0
+
+                                        if (autoRetry && currentAttempt < retryLimit) {
+                                            downloadRetryCount[id] = currentAttempt + 1
+                                            DownloadService.sendAddDownload(
+                                                appContext,
+                                                ExoDownloadService::class.java,
+                                                download.request,
+                                                false
+                                            )
+                                        }
+                                    }
                                     Download.STATE_STOPPED,
                                     Download.STATE_REMOVING,
                                     Download.STATE_RESTARTING -> {
@@ -232,12 +298,30 @@ constructor(
                                 }
                             }
                         }
+                                }
+                            }
+                        }
                     }
                 }
             )
         }
 
     init {
+        scope.launch {
+            appContext.dataStore.data.collect { prefs ->
+                var requirementsMask = Requirements.DEVICE_STORAGE_NOT_LOW
+                if (prefs[DownloadWifiOnlyKey] == true) {
+                    requirementsMask = requirementsMask or Requirements.NETWORK_UNMETERED
+                } else {
+                    requirementsMask = requirementsMask or Requirements.NETWORK
+                }
+                if (prefs[DownloadChargingOnlyKey] == true) {
+                    requirementsMask = requirementsMask or Requirements.DEVICE_CHARGING
+                }
+                downloadManager.requirements = Requirements(requirementsMask)
+            }
+        }
+
         val result = mutableMapOf<String, Download>()
         val cursor = downloadManager.downloadIndex.getDownloads()
         while (cursor.moveToNext()) {

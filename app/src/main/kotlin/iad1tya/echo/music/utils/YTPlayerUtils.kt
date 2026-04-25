@@ -4,6 +4,8 @@ import android.net.ConnectivityManager
 import android.net.Uri
 import androidx.media3.common.PlaybackException
 import iad1tya.echo.music.constants.AudioQuality
+import iad1tya.echo.music.constants.PlayerStreamClient
+import com.echo.innertube.CloudflareDnsResolver
 import com.echo.innertube.NewPipeUtils
 import com.echo.innertube.YouTube
 import com.echo.innertube.models.YouTubeClient
@@ -42,10 +44,22 @@ object YTPlayerUtils {
 
     private val httpClient = iad1tya.echo.music.dpi.core.DpiConfig.applyTo(
         OkHttpClient.Builder()
+            .dns(CloudflareDnsResolver)
             .apply {
                 YouTube.proxy?.let { proxy(it) }
             }
     ).build()
+        OkHttpClient.Builder()
+            .apply {
+                YouTube.proxy?.let { proxy(it) }
+            }
+    ).build()
+=======
+    private val httpClient = OkHttpClient.Builder()
+        .dns(CloudflareDnsResolver)
+        .proxy(YouTube.proxy)
+        .build()
+>>>>>>> upstream/main
     /**
      * The main client is used for metadata and initial streams.
      * [WEB_REMIX] provides correct metadata (loudnessDb), premium formats,
@@ -94,6 +108,20 @@ object YTPlayerUtils {
         enableFallback: Boolean = true,
         forceAllFallback: Boolean = false,
         databaseDao: DatabaseDao? = null,
+        preferredStreamClient: PlayerStreamClient = PlayerStreamClient.ANDROID_VR,
+        webClientPoTokenEnabled: Boolean = false,
+        useVisitorData: Boolean = false,
+        manualGvsPoToken: String? = null,
+        manualPlayerPoToken: String? = null,
+        forceAllFallback: Boolean = false,
+        databaseDao: DatabaseDao? = null,
+=======
+        preferredStreamClient: PlayerStreamClient = PlayerStreamClient.ANDROID_VR,
+        webClientPoTokenEnabled: Boolean = false,
+        useVisitorData: Boolean = false,
+        manualGvsPoToken: String? = null,
+        manualPlayerPoToken: String? = null,
+>>>>>>> upstream/main
     ): Result<PlaybackData> = runCatching {
         coroutineScope {
             Timber.tag(logTag).d("Fetching player response for videoId: $videoId, playlistId: $playlistId")
@@ -115,7 +143,50 @@ object YTPlayerUtils {
                 YouTube.visitorData
             }
 
+            val isLoggedIn = YouTube.cookie != null
+            val preferredClient = when (preferredStreamClient) {
+                PlayerStreamClient.ANDROID_VR -> ANDROID_VR_NO_AUTH
+                PlayerStreamClient.WEB_REMIX -> WEB_REMIX
+                PlayerStreamClient.IOS -> IOS
+                PlayerStreamClient.TVHTML5 -> TVHTML5
+                PlayerStreamClient.ANDROID -> MOBILE
+            }
+
+            val sessionId = if (isLoggedIn && !useVisitorData) {
+                YouTube.dataSyncId?.takeIf { it.isNotEmpty() } ?: YouTube.visitorData
+            } else {
+                YouTube.visitorData
+            }
+
             val sigTimestampDeferred = async(Dispatchers.IO) {
+                getSignatureTimestampOrNull(videoId)
+            }
+            val poTokenDeferred = async(Dispatchers.IO) {
+                if (!manualGvsPoToken.isNullOrBlank() && !manualPlayerPoToken.isNullOrBlank()) {
+                    PoTokenResult(playerRequestPoToken = manualPlayerPoToken, streamingDataPoToken = manualGvsPoToken)
+                } else if (webClientPoTokenEnabled && MAIN_CLIENT.useWebPoTokens && sessionId != null) {
+                    Timber.tag(logTag).d("Generating PoToken for ${MAIN_CLIENT.clientName}")
+                    try {
+                        poTokenGenerator.getWebClientPoToken(videoId, sessionId)
+                    } catch (e: Exception) {
+                        Timber.tag(logTag).e(e, "PoToken generation failed: ${e.message}")
+                        null
+                    }
+                } else null
+            }
+
+            val signatureTimestamp = sigTimestampDeferred.await()
+                ?: cachedPublicVideoId?.let { fallbackId ->
+                    getSignatureTimestampOrNull(fallbackId)
+                }
+
+            var currentVideoId = videoId
+            if (enableFallback && databaseDao != null) {
+                val cachedFallback = databaseDao.getSetVideoId(videoId)
+                if (cachedFallback != null && cachedFallback.setVideoId != null) {
+                    currentVideoId = cachedFallback.setVideoId!!
+                }
+            }
                 getSignatureTimestampOrNull(videoId)
             }
             val poTokenDeferred = async(Dispatchers.IO) {
@@ -147,6 +218,39 @@ object YTPlayerUtils {
                 if (cachedFallback != null && cachedFallback.setVideoId != null) {
                     currentVideoId = cachedFallback.setVideoId!!
                     Timber.tag(logTag).d("Using cached fallback videoId: $currentVideoId for original: $videoId")
+=======
+        val preferredClient = when (preferredStreamClient) {
+            PlayerStreamClient.ANDROID_VR -> ANDROID_VR_NO_AUTH
+            PlayerStreamClient.WEB_REMIX -> WEB_REMIX
+            PlayerStreamClient.IOS -> IOS
+            PlayerStreamClient.TVHTML5 -> TVHTML5
+            PlayerStreamClient.ANDROID -> MOBILE
+        }
+
+        // Generate PoToken for clients that require it (WEB_REMIX, TVHTML5)
+        var poToken: PoTokenResult? = if (
+            !manualGvsPoToken.isNullOrBlank() && !manualPlayerPoToken.isNullOrBlank()
+        ) {
+            PoTokenResult(
+                playerRequestPoToken = manualPlayerPoToken,
+                streamingDataPoToken = manualGvsPoToken,
+            )
+        } else {
+            null
+        }
+        // Use dataSyncId when logged in, fall back to visitorData if dataSyncId is empty/null
+        val sessionId = if (isLoggedIn && !useVisitorData) {
+            YouTube.dataSyncId?.takeIf { it.isNotEmpty() } ?: YouTube.visitorData
+        } else {
+            YouTube.visitorData
+        }
+        if (poToken == null && webClientPoTokenEnabled && MAIN_CLIENT.useWebPoTokens && sessionId != null) {
+            Timber.tag(logTag).d("Generating PoToken for ${MAIN_CLIENT.clientName}")
+            try {
+                poToken = poTokenGenerator.getWebClientPoToken(videoId, sessionId)
+                if (poToken != null) {
+                    Timber.tag(logTag).d("PoToken generated successfully")
+>>>>>>> upstream/main
                 }
             }
 
@@ -261,42 +365,30 @@ object YTPlayerUtils {
         // Check if main client response failed (not OK and not age-restricted)
         val mainClientFailed = mainPlayerResponse.playabilityStatus.status != "OK" && !isAgeRestricted
 
-        // Determine starting client index (matches Metrolist's logic exactly):
-        // - Private/uploaded tracks: ALWAYS start at TVHTML5 (index 1).
-        //   WEB_REMIX may return OK metadata but its streams don't work for uploaded tracks;
-        //   TVHTML5 with a valid cookie is the only client that streams them reliably.
-        // - Age-restricted: start at index 0 (TVHTML5_SIMPLY_EMBEDDED_PLAYER)
-        // - Main client failed for non-private: start at index 0 to try all fallback clients
-        // - Normal content: start at -1 (use WEB_REMIX streams first)
-        val startIndex = when {
-            isPrivateTrack && !mainClientFailed -> -1  // WEB_REMIX OK: try its streams first
-            isPrivateTrack && mainClientFailed -> 1    // WEB_REMIX failed: skip to TVHTML5
-            isAgeRestricted -> 0      // Skip main client
-            mainClientFailed -> 0     // Try all fallback clients
-            else -> -1
-        }
+        val streamClients = buildList {
+            add(preferredClient)
+            add(MAIN_CLIENT)
+            addAll(STREAM_FALLBACK_CLIENTS)
+        }.distinctBy { it.clientName }
 
         if (isPrivateTrack) {
-            Timber.tag(logTag).d("Private/uploaded track: trying WEB_REMIX streams first (with pot=)")
+            Timber.tag(logTag).d("Private/uploaded track: trying selected stream client first")
         }
         if (mainClientFailed && !isPrivateTrack) {
             Timber.tag(logTag).d("Main client returned status '${mainPlayerResponse.playabilityStatus.status}': ${mainPlayerResponse.playabilityStatus.reason}, trying fallback clients")
         }
 
-        for (clientIndex in (startIndex until STREAM_FALLBACK_CLIENTS.size)) {
+        for ((clientIndex, client) in streamClients.withIndex()) {
             // reset for each client
             format = null
             streamUrl = null
             streamExpiresInSeconds = null
 
-            val client: YouTubeClient
-            if (clientIndex == -1) {
-                client = MAIN_CLIENT
+            if (client.clientName == MAIN_CLIENT.clientName) {
                 streamPlayerResponse = mainPlayerResponse
                 Timber.tag(logTag).d("Trying stream from MAIN_CLIENT: ${client.clientName}")
             } else {
-                client = STREAM_FALLBACK_CLIENTS[clientIndex]
-                Timber.tag(logTag).d("Trying fallback client ${clientIndex + 1}/${STREAM_FALLBACK_CLIENTS.size}: ${client.clientName}")
+                Timber.tag(logTag).d("Trying fallback client ${clientIndex + 1}/${streamClients.size}: ${client.clientName}")
 
                 if (client.loginRequired && !isLoggedIn && YouTube.cookie == null) {
                     Timber.tag(logTag).d("Skipping client ${client.clientName} - requires login but user is not logged in")
@@ -308,7 +400,7 @@ object YTPlayerUtils {
                 // Only pass poToken to clients that support it AND when we have a valid-sized token.
                 // An 88-byte token (too small) causes YouTube to reject requests differently than no token.
                 // Valid PoTokens are base64-encoded 110-128 byte arrays (~148-172 base64 chars).
-                val clientPoToken = if (client.useWebPoTokens) {
+                val clientPoToken = if (webClientPoTokenEnabled && client.useWebPoTokens) {
                     val pt = poToken?.playerRequestPoToken
                     if (pt != null && pt.length >= 100) pt else null
                 } else null
@@ -319,7 +411,7 @@ object YTPlayerUtils {
 
             // process current client response
             if (streamPlayerResponse?.playabilityStatus?.status == "OK") {
-                Timber.tag(logTag).d("Player response status OK for client: ${if (clientIndex == -1) MAIN_CLIENT.clientName else STREAM_FALLBACK_CLIENTS[clientIndex].clientName}")
+                Timber.tag(logTag).d("Player response status OK for client: ${client.clientName}")
 
                 // Try NewPipe stream enrichment (deobfuscated URLs)
                 // Skip for age-restricted (no auth) and private tracks (NewPipe can't access private videos)
@@ -357,11 +449,10 @@ object YTPlayerUtils {
                 // Append pot= streaming data token for web-based clients or private tracks.
                 // YouTube CDN requires this token on the stream URL for web/TV clients in 2026.
                 // Only append if the streaming token is valid size (>= 100 base64 chars).
-                val currentClient = if (clientIndex == -1) MAIN_CLIENT else STREAM_FALLBACK_CLIENTS[clientIndex]
                 val streamingToken = poToken?.streamingDataPoToken
-                if ((currentClient.useWebPoTokens || isPrivateTrack) &&
+                if ((webClientPoTokenEnabled && (client.useWebPoTokens || isPrivateTrack)) &&
                     streamingToken != null && streamingToken.length >= 100) {
-                    Timber.tag(logTag).d("Appending pot= parameter to stream URL for ${currentClient.clientName}")
+                    Timber.tag(logTag).d("Appending pot= parameter to stream URL for ${client.clientName}")
                     val separator = if ("?" in streamUrl!!) "&" else "?"
                     streamUrl = "${streamUrl}${separator}pot=${Uri.encode(streamingToken)}"
                 }
@@ -384,23 +475,47 @@ object YTPlayerUtils {
                 // then continues past the valid TVHTML5 stream to eventual WEB_CREATOR failure.
                 val isPrivatelyOwned = streamPlayerResponse?.videoDetails?.musicVideoType ==
                     "MUSIC_VIDEO_TYPE_PRIVATELY_OWNED_TRACK" || isUploadedTrack || isPrivateTrack
-                if (clientIndex == -1 || clientIndex == STREAM_FALLBACK_CLIENTS.size - 1 || isPrivatelyOwned) {
+                if (clientIndex == streamClients.size - 1 || isPrivatelyOwned) {
+                    if (isPrivatelyOwned) {
+                        Timber.tag(logTag).d("Skipping validation for privately owned/uploaded track (client: ${client.clientName})")
+                    } else {
+                        Timber.tag(logTag).d("Using last fallback client without validation: ${client.clientName}")
+                    }
+                    break
+                }
                     if (isPrivatelyOwned) {
                         Timber.tag(logTag).d("Skipping validation for privately owned/uploaded track")
                     } else if (clientIndex == -1) {
                         Timber.tag(logTag).d("Using MAIN_CLIENT without extra validation for speed")
                     } else {
                         Timber.tag(logTag).d("Using last fallback client without validation")
+=======
+
+                if (clientIndex == streamClients.size - 1 || isPrivatelyOwned) {
+                    if (isPrivatelyOwned) {
+                        Timber.tag(logTag).d("Skipping validation for privately owned/uploaded track (client: ${client.clientName})")
+                    } else {
+                        Timber.tag(logTag).d("Using last fallback client without validation: ${client.clientName}")
+>>>>>>> upstream/main
                     }
                     break
                 }
 
                 // Only validate for fallback clients that are not the last one
                 if (validateStatus(streamUrl)) {
-                    Timber.tag(logTag).d("Stream validated successfully")
+                    Timber.tag(logTag).d("Stream validated successfully with client: ${client.clientName}")
+                    break
+                } else {
+                    Timber.tag(logTag).d("Stream validation failed for client: ${client.clientName}")
                     break
                 } else {
                     Timber.tag(logTag).d("Stream validation failed, trying next client")
+=======
+                    Timber.tag(logTag).d("Stream validated successfully with client: ${client.clientName}")
+                    break
+                } else {
+                    Timber.tag(logTag).d("Stream validation failed for client: ${client.clientName}")
+>>>>>>> upstream/main
                 }
             } else {
                 Timber.tag(logTag).d("Player response status not OK: ${streamPlayerResponse?.playabilityStatus?.status}")
@@ -498,7 +613,28 @@ object YTPlayerUtils {
      * Adds authentication cookie for privately owned/uploaded tracks.
      */
     private fun validateStatus(url: String): Boolean {
+        Timber.tag(logTag).d("Validating stream URL status")
         return try {
+            val clientParam = url.substringAfter("?", "").split('&')
+                .firstOrNull { it.startsWith("c=") }
+                ?.substringAfter('=')
+
+            val vClient = httpClient.newBuilder()
+                .connectTimeout(2, java.util.concurrent.TimeUnit.SECONDS)
+                .readTimeout(2, java.util.concurrent.TimeUnit.SECONDS)
+                .build()
+
+            val requestBuilder = okhttp3.Request.Builder()
+                .head()
+                .url(url)
+                .header("User-Agent", StreamClientUtils.resolveUserAgent(clientParam))
+
+            val originReferer = StreamClientUtils.resolveOriginReferer(clientParam)
+            originReferer.origin?.let { requestBuilder.addHeader("Origin", it) }
+            originReferer.referer?.let { requestBuilder.addHeader("Referer", it) }
+
+            YouTube.cookie?.let { requestBuilder.addHeader("Cookie", it) }
+            vClient.newCall(requestBuilder.build()).execute().use { it.isSuccessful }
             val client = httpClient.newBuilder()
                 .connectTimeout(2, java.util.concurrent.TimeUnit.SECONDS)
                 .readTimeout(2, java.util.concurrent.TimeUnit.SECONDS)
@@ -508,6 +644,31 @@ object YTPlayerUtils {
                 .url(url)
             YouTube.cookie?.let { requestBuilder.addHeader("Cookie", it) }
             client.newCall(requestBuilder.build()).execute().use { it.isSuccessful }
+=======
+        Timber.tag(logTag).d("Validating stream URL status")
+        try {
+            val clientParam = url.substringAfter("?", "").split('&')
+                .firstOrNull { it.startsWith("c=") }
+                ?.substringAfter('=')
+            val requestBuilder = okhttp3.Request.Builder()
+                .head()
+                .url(url)
+                .header("User-Agent", StreamClientUtils.resolveUserAgent(clientParam))
+
+            val originReferer = StreamClientUtils.resolveOriginReferer(clientParam)
+            originReferer.origin?.let { requestBuilder.addHeader("Origin", it) }
+            originReferer.referer?.let { requestBuilder.addHeader("Referer", it) }
+
+            // Add authentication cookie for privately owned tracks
+            YouTube.cookie?.let { cookie ->
+                requestBuilder.addHeader("Cookie", cookie)
+            }
+
+            val response = httpClient.newCall(requestBuilder.build()).execute()
+            val isSuccessful = response.isSuccessful
+            Timber.tag(logTag).d("Stream URL validation result: ${if (isSuccessful) "Success" else "Failed"} (${response.code})")
+            return isSuccessful
+>>>>>>> upstream/main
         } catch (e: Exception) {
             false
         }

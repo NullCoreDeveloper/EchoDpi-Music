@@ -1,10 +1,12 @@
 package iad1tya.echo.music.ui.screens
 
+import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.core.tween
 import androidx.datastore.preferences.core.edit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import iad1tya.echo.music.utils.dataStore
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -36,13 +38,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.Lifecycle
 import androidx.navigation.NavGraphBuilder
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import iad1tya.echo.music.R
 import iad1tya.echo.music.constants.DarkModeKey
-import iad1tya.echo.music.constants.PureBlackKey
 import iad1tya.echo.music.ui.component.BottomSheet
 import iad1tya.echo.music.ui.component.BottomSheetMenu
 import iad1tya.echo.music.ui.component.LocalMenuState
@@ -70,6 +72,7 @@ import iad1tya.echo.music.ui.screens.settings.BackupAndRestore
 import iad1tya.echo.music.ui.screens.settings.ContentSettings
 import iad1tya.echo.music.ui.screens.settings.DarkMode
 import iad1tya.echo.music.ui.screens.settings.PlayerSettings
+import iad1tya.echo.music.ui.screens.settings.PoTokenScreen
 import iad1tya.echo.music.ui.screens.settings.PrivacySettings
 import iad1tya.echo.music.ui.screens.settings.RomanizationSettings
 import iad1tya.echo.music.ui.screens.settings.SettingsScreen
@@ -80,14 +83,88 @@ import iad1tya.echo.music.ui.screens.settings.SupporterScreen
 import iad1tya.echo.music.ui.screens.settings.UpdaterScreen
 import iad1tya.echo.music.ui.screens.settings.AiSettings
 import iad1tya.echo.music.ui.screens.settings.DiscordLoginScreen
+import iad1tya.echo.music.ui.screens.settings.DiagnosticsSettings
 import iad1tya.echo.music.ui.screens.settings.DiscordSettings
 import iad1tya.echo.music.ui.screens.settings.LastFMSettings
+import iad1tya.echo.music.ui.screens.settings.NetworkTroubleshootSettings
 import iad1tya.echo.music.ui.utils.ShowMediaInfo
 import iad1tya.echo.music.ui.player.VideoPlayerScreen
 import iad1tya.echo.music.utils.rememberEnumPreference
 import iad1tya.echo.music.utils.rememberPreference
-import androidx.datastore.preferences.core.edit
-import iad1tya.echo.music.utils.dataStore
+
+private const val TOP_LEVEL_TAB_ANIMATION_DURATION = 340
+private const val TOP_LEVEL_TAB_FADE_IN_DURATION = 260
+private const val TOP_LEVEL_TAB_FADE_OUT_DURATION = 240
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.topLevelTabEnterTransition() =
+    when (targetState.destination.route) {
+        Screens.Library.route ->
+            slideIntoContainer(
+                AnimatedContentTransitionScope.SlideDirection.Left,
+                tween(TOP_LEVEL_TAB_ANIMATION_DURATION, easing = FastOutSlowInEasing),
+            ) + fadeIn(tween(TOP_LEVEL_TAB_FADE_IN_DURATION, easing = FastOutSlowInEasing))
+
+        Screens.Home.route ->
+            slideIntoContainer(
+                AnimatedContentTransitionScope.SlideDirection.Right,
+                tween(TOP_LEVEL_TAB_ANIMATION_DURATION, easing = FastOutSlowInEasing),
+            ) + fadeIn(tween(TOP_LEVEL_TAB_FADE_IN_DURATION, easing = FastOutSlowInEasing))
+
+        else -> fadeIn(tween(TOP_LEVEL_TAB_FADE_IN_DURATION, easing = FastOutSlowInEasing))
+    }
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.topLevelTabExitTransition() =
+    when (targetState.destination.route) {
+        Screens.Library.route ->
+            slideOutOfContainer(
+                AnimatedContentTransitionScope.SlideDirection.Left,
+                tween(TOP_LEVEL_TAB_ANIMATION_DURATION, easing = FastOutSlowInEasing),
+            ) + fadeOut(tween(TOP_LEVEL_TAB_FADE_OUT_DURATION, easing = FastOutSlowInEasing))
+
+        Screens.Home.route ->
+            slideOutOfContainer(
+                AnimatedContentTransitionScope.SlideDirection.Right,
+                tween(TOP_LEVEL_TAB_ANIMATION_DURATION, easing = FastOutSlowInEasing),
+            ) + fadeOut(tween(TOP_LEVEL_TAB_FADE_OUT_DURATION, easing = FastOutSlowInEasing))
+
+        else -> fadeOut(tween(TOP_LEVEL_TAB_FADE_OUT_DURATION, easing = FastOutSlowInEasing))
+    }
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.topLevelTabPopEnterTransition() =
+    when (initialState.destination.route) {
+        Screens.Library.route ->
+            slideIntoContainer(
+                AnimatedContentTransitionScope.SlideDirection.Right,
+                tween(TOP_LEVEL_TAB_ANIMATION_DURATION, easing = FastOutSlowInEasing),
+            ) + fadeIn(tween(TOP_LEVEL_TAB_FADE_IN_DURATION, easing = FastOutSlowInEasing))
+
+        Screens.Home.route ->
+            slideIntoContainer(
+                AnimatedContentTransitionScope.SlideDirection.Left,
+                tween(TOP_LEVEL_TAB_ANIMATION_DURATION, easing = FastOutSlowInEasing),
+            ) + fadeIn(tween(TOP_LEVEL_TAB_FADE_IN_DURATION, easing = FastOutSlowInEasing))
+
+        else -> fadeIn(tween(TOP_LEVEL_TAB_FADE_IN_DURATION, easing = FastOutSlowInEasing))
+    }
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.topLevelTabPopExitTransition() =
+    when (initialState.destination.route) {
+        Screens.Library.route ->
+            slideOutOfContainer(
+                AnimatedContentTransitionScope.SlideDirection.Right,
+                tween(TOP_LEVEL_TAB_ANIMATION_DURATION, easing = FastOutSlowInEasing),
+            ) + fadeOut(tween(TOP_LEVEL_TAB_FADE_OUT_DURATION, easing = FastOutSlowInEasing))
+
+        Screens.Home.route ->
+            slideOutOfContainer(
+                AnimatedContentTransitionScope.SlideDirection.Left,
+                tween(TOP_LEVEL_TAB_ANIMATION_DURATION, easing = FastOutSlowInEasing),
+            ) + fadeOut(tween(TOP_LEVEL_TAB_FADE_OUT_DURATION, easing = FastOutSlowInEasing))
+
+        else -> fadeOut(tween(TOP_LEVEL_TAB_FADE_OUT_DURATION, easing = FastOutSlowInEasing))
+    }
+
+>>>>>>> upstream/main
 
 @OptIn(ExperimentalMaterial3Api::class)
 fun NavGraphBuilder.navigationBuilder(
@@ -96,7 +173,13 @@ fun NavGraphBuilder.navigationBuilder(
     latestVersionName: String,
     onOpenPlayer: () -> Unit,
 ) {
-    composable(Screens.Home.route) {
+    composable(
+        Screens.Home.route,
+        enterTransition = { topLevelTabEnterTransition() },
+        exitTransition = { topLevelTabExitTransition() },
+        popEnterTransition = { topLevelTabPopEnterTransition() },
+        popExitTransition = { topLevelTabPopExitTransition() },
+    ) {
         HomeScreen(navController)
     }
     composable(Screens.Search.route) {
@@ -107,6 +190,10 @@ fun NavGraphBuilder.navigationBuilder(
     }
     composable(
         Screens.Library.route,
+        enterTransition = { topLevelTabEnterTransition() },
+        exitTransition = { topLevelTabExitTransition() },
+        popEnterTransition = { topLevelTabPopEnterTransition() },
+        popExitTransition = { topLevelTabPopExitTransition() },
     ) {
         LibraryScreen(navController)
     }
@@ -342,6 +429,9 @@ fun NavGraphBuilder.navigationBuilder(
     composable("settings/content") {
         ContentSettings(navController, scrollBehavior)
     }
+    composable("settings/content/po_token") {
+        PoTokenScreen(navController)
+    }
     composable("settings/content/romanization") {
         RomanizationSettings(navController, scrollBehavior)
     }
@@ -390,6 +480,13 @@ fun NavGraphBuilder.navigationBuilder(
             onBack = { navController.navigateUp() }
         )
     }
+    composable("settings/diagnostics") {
+        DiagnosticsSettings(navController, scrollBehavior)
+    }
+    composable("settings/network_troubleshoot") {
+        NetworkTroubleshootSettings(navController, scrollBehavior)
+    }
+    }
     composable("settings/backup_restore") {
         BackupAndRestore(navController, scrollBehavior)
     }
@@ -413,6 +510,9 @@ fun NavGraphBuilder.navigationBuilder(
     }
     composable("settings/lastfm") {
         LastFMSettings(navController, scrollBehavior)
+    }
+    composable("listen_together") {
+        ListenTogetherScreen(navController)
     }
     composable("login") {
         LoginScreen(navController)

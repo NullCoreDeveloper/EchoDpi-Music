@@ -291,6 +291,30 @@
     <string name="content_language">Langue par défaut du contenu</string>
     <string name="content_country">Pays par défaut du contenu</string>
     <string name="system_default">Valeur par défaut du système</string>
+    <string name="playback_client">Client de lecture</string>
+    <string name="preferred_playback_client">Client de lecture préféré</string>
+    <string name="po_token_generation">Génération de PoToken</string>
+    <string name="web_client_po_token_enabled">Client Web PoToken activé</string>
+    <string name="web_client_po_token_disabled">Client Web PoToken désactivé</string>
+    <string name="web_client_po_token">Utiliser le client Web PoToken</string>
+    <string name="web_client_po_token_desc">Utilisez les valeurs PoToken générées pour les demandes de lecture sur le Web ou la télévision</string>
+    <string name="token_settings">Paramètres des jetons</string>
+    <string name="use_visitor_data">Utiliser visitorData à la place de dataSyncId</string>
+    <string name="use_visitor_data_desc">Utile lorsque le contexte de connexion par cookie est incomplet ou incohérent</string>
+    <string name="cookies_must_be_disabled">Désactivez les cookies de connexion avant d\'activer le mode « visitorData ».</string>
+    <string name="source_url">URL source</string>
+    <string name="source_url_placeholder">https://youtube.com/account</string>
+    <string name="regenerate_token">Jeton de régénération</string>
+    <string name="regenerate">Régénérer</string>
+    <string name="generated_tokens">Jetons générés</string>
+    <string name="po_token_gvs">PoToken (GVS)</string>
+    <string name="po_token_player">PoToken (Lecteur)</string>
+    <string name="visitor_data">Données des visiteurs</string>
+    <string name="token_copied">Jeton copié</string>
+    <string name="tokens_generated">Jetons générés</string>
+    <string name="token_generation_failed">Échec de la génération de jetons</string>
+    <string name="open_account_before_extract">Ouvrez la page du compte cible avant d\'extraire les jetons.</string>
+    <string name="extracting_token">Extraction du jeton...</string>
     <string name="enable_proxy">Activer le proxy</string>
     <string name="proxy_type">Type de proxy</string>
     <string name="proxy_url">URL du proxy</string>
@@ -311,6 +335,8 @@
     <string name="auto_skip_next_on_error">Passer automatiquement au titre suivant en cas d\'erreur</string>
     <string name="auto_skip_next_on_error_desc">Assurez-vous une expérience de lecture continue</string>
     <string name="stop_music_on_task_clear">Arrêter la musique lors de la fin de la tâche</string>
+    <string name="force_stop_on_task_clear">Forcer l\'arrêt de l\'application lors de la suppression des tâches (Bêta)</string>
+    <string name="force_stop_on_task_clear_desc">Empêche la lecture automatique de la musique lorsque les écouteurs sont reconnectés</string>
     <string name="equalizer">Égaliseur</string>
 
     <string name="storage">Stockage</string>
@@ -396,6 +422,15 @@
     
     <string name="local_media">Médias Locaux</string>
     <string name="no_local_media_found">Aucun média local trouvé</string>
+    <string name="local_media_permission_title">Accédez à Votre Musique</string>
+    <string name="local_media_permission_desc">Autorisez l\'accès au stockage pour analyser et lire les fichiers musicaux stockés sur votre appareil. Compatible avec les formats MP3, FLAC, OGG, Opus, AAC, WAV, ALAC, WMA, APE, MKA, WebM, AIFF et bien d\'autres.</string>
+    <string name="grant_permission">Accorder l\'autorisation</string>
+    <string name="scanning_local_media">Analyse des médias locaux…</string>
+    <string name="rescan_local_media">Réanalyser les médias locaux</string>
+    <string name="local_media_scan_hint">Appuyez sur « Rechercher » pour lancer une recherche de fichiers musicaux sur votre appareil. Vous pouvez configurer les chemins de recherche dans Paramètres → Médias Locaux.</string>
+    <string name="scan_now">Analysez maintenant</string>
+    <string name="no_local_albums_found">Aucun album trouvé</string>
+    <string name="no_local_artists_found">Aucun artiste trouvé</string>
 
     <!-- Widget -->
     <string name="widget_description">Widget lecteur de musique</string>

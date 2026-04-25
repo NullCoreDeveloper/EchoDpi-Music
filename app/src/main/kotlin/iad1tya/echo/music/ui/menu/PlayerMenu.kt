@@ -1,10 +1,6 @@
 package iad1tya.echo.music.ui.menu
 
-import android.content.Intent
 import android.content.res.Configuration
-import android.media.audiofx.AudioEffect
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
@@ -68,6 +64,7 @@ import androidx.media3.exoplayer.offline.Download
 import androidx.media3.exoplayer.offline.DownloadRequest
 import androidx.media3.exoplayer.offline.DownloadService
 import androidx.navigation.NavController
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.echo.innertube.YouTube
 import com.echo.innertube.models.WatchEndpoint
 import iad1tya.echo.music.LocalDatabase
@@ -75,6 +72,7 @@ import iad1tya.echo.music.LocalDownloadUtil
 import iad1tya.echo.music.LocalPlayerConnection
 import iad1tya.echo.music.R
 import iad1tya.echo.music.constants.ListItemHeight
+import iad1tya.echo.music.constants.CrossfadeEnabledKey
 import iad1tya.echo.music.models.MediaMetadata
 import iad1tya.echo.music.playback.ExoDownloadService
 import iad1tya.echo.music.playback.queues.YouTubeQueue
@@ -85,6 +83,8 @@ import iad1tya.echo.music.ui.component.AdvancedDownloadDialog
 import iad1tya.echo.music.ui.component.NewAction
 import iad1tya.echo.music.ui.component.NewActionGrid
 import iad1tya.echo.music.ui.component.RingtoneTrimDialog
+import iad1tya.echo.music.viewmodels.ConnectivityViewModel
+import iad1tya.echo.music.utils.rememberPreference
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlin.math.log2
@@ -98,21 +98,24 @@ fun PlayerMenu(
     playerBottomSheetState: BottomSheetState,
     isQueueTrigger: Boolean? = false,
     onShowDetailsDialog: () -> Unit,
+    onShowAudioOutput: (() -> Unit)? = null,
     onDismiss: () -> Unit,
 ) {
     mediaMetadata ?: return
     val context = LocalContext.current
     val database = LocalDatabase.current
     val playerConnection = LocalPlayerConnection.current ?: return
+    val connectivityViewModel: ConnectivityViewModel = hiltViewModel()
     val playerVolume = playerConnection.service.playerVolume.collectAsState()
-    val activityResultLauncher =
-        rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { }
+    val connectedBluetoothDevices by connectivityViewModel.connectedBluetoothDevices.collectAsState()
     val librarySong by database.song(mediaMetadata.id).collectAsState(initial = null)
     val coroutineScope = rememberCoroutineScope()
 
     val downloadUtil = LocalDownloadUtil.current
     val download by downloadUtil.getDownload(mediaMetadata.id)
         .collectAsState(initial = null)
+
+    val (crossfadeEnabled, onCrossfadeEnabledChange) = rememberPreference(CrossfadeEnabledKey, defaultValue = false)
 
     val artists =
         remember(mediaMetadata.artists) {
@@ -228,9 +231,19 @@ fun PlayerMenu(
         mutableStateOf(false)
     }
 
+    var showEqualizerDialog by rememberSaveable {
+        mutableStateOf(false)
+    }
+
     if (showPitchTempoDialog) {
         TempoPitchDialog(
             onDismiss = { showPitchTempoDialog = false },
+        )
+    }
+
+    if (showEqualizerDialog) {
+        EqualizerDialog(
+            onDismiss = { showEqualizerDialog = false },
         )
     }
 
@@ -349,7 +362,7 @@ fun PlayerMenu(
                                             insert(mediaMetadata)
                                         }
                                         val downloadRequest = DownloadRequest
-                                            .Builder(mediaMetadata.id, mediaMetadata.id.toUri())
+                                            .Builder(mediaMetadata.id, "echo://${mediaMetadata.id}".toUri())
                                             .setCustomCacheKey(mediaMetadata.id)
                                             .setData(mediaMetadata.title.toByteArray())
                                             .build()
@@ -378,15 +391,15 @@ fun PlayerMenu(
                         NewAction(
                             icon = {
                                 Icon(
-                                    painter = painterResource(R.drawable.bedtime), 
+                                    painter = painterResource(R.drawable.audio_device),
                                     contentDescription = null,
                                     modifier = Modifier.size(36.dp),
                                     tint = MaterialTheme.colorScheme.onSurface
                                 )
                             },
-                            text = "Ambient Mode",
+                            text = "Audio Output",
                             onClick = {
-                                navController.navigate("ambient_mode")
+                                onShowAudioOutput?.invoke()
                                 onDismiss()
                             }
                         )
@@ -396,18 +409,100 @@ fun PlayerMenu(
             }
         }
 
-        if (artists.isNotEmpty()) {
+        item {
+            MenuGroup {
+                MenuEntry(
+                    icon = R.drawable.radio,
+                    text = stringResource(R.string.start_radio),
+                    onClick = {
+                        playerConnection.playQueue(YouTubeQueue.radio(mediaMetadata))
+                        onDismiss()
+                    }
+                )
+                MenuEntry(
+                    icon = R.drawable.waves,
+                    text = if (crossfadeEnabled) "Disable crossfade" else "Enable crossfade",
+                    onClick = {
+                        onCrossfadeEnabledChange(!crossfadeEnabled)
+                        onDismiss()
+                    }
+                )
+                MenuEntry(
+                    icon = R.drawable.bedtime,
+                    text = "Ambient mode",
+                    onClick = {
+                        navController.navigate("ambient_mode")
+                        playerBottomSheetState.collapseSoft()
+                        onDismiss()
+                    }
+                )
+                MenuEntry(
+                    icon = R.drawable.download,
+                    text = "Local Download",
+                    onClick = {
+                        showAdvancedDownloadDialog = true
+                    }
+                )
+                MenuEntry(
+                    icon = R.drawable.notification,
+                    text = "Set ringtone",
+                    onClick = {
+                        showRingtoneTrimDialog = true
+                    }
+                )
+            }
+        }
+
+        if (isQueueTrigger != true) {
             item {
                 MenuGroup {
-                     MenuEntry(
-                        icon = R.drawable.radio,
-                        text = stringResource(R.string.start_radio),
+                    MenuEntry(
+                        icon = R.drawable.equalizer,
+                        text = stringResource(R.string.equalizer),
                         onClick = {
-                            playerConnection.playQueue(YouTubeQueue.radio(mediaMetadata))
+                            showEqualizerDialog = true
+                        }
+                    )
+                    MenuEntry(
+                        icon = R.drawable.tune,
+                        text = stringResource(R.string.advanced),
+                        onClick = {
+                            showPitchTempoDialog = true
+                        }
+                    )
+                }
+            }
+
+            item {
+                MenuGroup {
+                    MenuEntry(
+                        icon = R.drawable.group_outlined,
+                        text = "Listen Together",
+                        onClick = {
+                            navController.navigate("listen_together")
+                            playerBottomSheetState.collapseSoft()
+                            onDismiss()
+                        },
+                    )
+                }
+            }
+        }
+
+        item {
+            MenuGroup {
+                if (mediaMetadata.album != null) {
+                    MenuEntry(
+                        icon = R.drawable.album,
+                        text = stringResource(R.string.view_album),
+                        onClick = {
+                            navController.navigate("album/${mediaMetadata.album.id}")
+                            playerBottomSheetState.collapseSoft()
                             onDismiss()
                         }
                     )
-                     MenuEntry(
+                }
+                if (artists.isNotEmpty()) {
+                    MenuEntry(
                         icon = R.drawable.artist,
                         text = stringResource(R.string.view_artist),
                         onClick = {
@@ -420,23 +515,7 @@ fun PlayerMenu(
                             }
                         }
                     )
-                     if (mediaMetadata.album != null) {
-                        MenuEntry(
-                            icon = R.drawable.album,
-                            text = stringResource(R.string.view_album),
-                            onClick = {
-                                navController.navigate("album/${mediaMetadata.album.id}")
-                                playerBottomSheetState.collapseSoft()
-                                onDismiss()
-                            }
-                        )
-                    }
                 }
-            }
-        }
-        
-        item {
-            MenuGroup {
                 MenuEntry(
                     icon = R.drawable.info,
                     text = stringResource(R.string.details),
@@ -445,51 +524,6 @@ fun PlayerMenu(
                         onDismiss()
                     }
                 )
-                 MenuEntry(
-                    icon = R.drawable.download,
-                    text = "Local Download",
-                    onClick = {
-                        showAdvancedDownloadDialog = true
-                    }
-                )
-                MenuEntry(
-                    icon = R.drawable.notification,
-                    text = "Set ringtone",
-                    onClick = { showRingtoneTrimDialog = true }
-                )
-            }
-        }
-
-        if (isQueueTrigger != true) {
-             item {
-                MenuGroup {
-                    MenuEntry(
-                        icon = R.drawable.equalizer,
-                        text = stringResource(R.string.equalizer),
-                        onClick = {
-                            val intent =
-                                Intent(AudioEffect.ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL).apply {
-                                    putExtra(
-                                        AudioEffect.EXTRA_AUDIO_SESSION,
-                                        playerConnection.player.audioSessionId,
-                                    )
-                                    putExtra(AudioEffect.EXTRA_PACKAGE_NAME, context.packageName)
-                                    putExtra(AudioEffect.EXTRA_CONTENT_TYPE, AudioEffect.CONTENT_TYPE_MUSIC)
-                                }
-                            if (intent.resolveActivity(context.packageManager) != null) {
-                                activityResultLauncher.launch(intent)
-                            }
-                            onDismiss()
-                        }
-                    )
-                    MenuEntry(
-                        icon = R.drawable.tune,
-                        text = stringResource(R.string.advanced),
-                        onClick = {
-                            showPitchTempoDialog = true
-                        }
-                    )
-                }
             }
         }
     }

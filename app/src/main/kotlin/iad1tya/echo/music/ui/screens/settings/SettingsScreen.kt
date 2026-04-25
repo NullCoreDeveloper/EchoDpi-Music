@@ -56,6 +56,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.navigation.NavController
+import com.echo.innertube.CloudflareDnsResolver
 import iad1tya.echo.music.BuildConfig
 import iad1tya.echo.music.LocalPlayerAwareWindowInsets
 import iad1tya.echo.music.R
@@ -175,7 +176,9 @@ fun SettingsScreen(
                                 coroutineScope.launch(Dispatchers.IO) {
                                     try {
                                         // Fetch latest release info
-                                        val client = okhttp3.OkHttpClient()
+                                        val client = okhttp3.OkHttpClient.Builder()
+                                            .dns(CloudflareDnsResolver)
+                                            .build()
                                         val request = okhttp3.Request.Builder()
                                             .url("https://api.github.com/repos/NullCoreDeveloper/EchoDpi-Music/releases/latest")
                                             .build()
@@ -340,10 +343,10 @@ fun SettingsScreen(
                 )
             )
         )
-        
+
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Privacy & Security Section
+        // Privacy - Separate
         Material3SettingsGroup(
             title = stringResource(R.string.settings_section_privacy),
             items = listOf(
@@ -356,6 +359,19 @@ fun SettingsScreen(
                     icon = painterResource(R.drawable.security), // Backup icon for security
                     title = { Text("Обход блокировок (DPI)") },
                     onClick = { navController.navigate("settings/dpi") }
+                )
+            )
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Diagnostics - Separate
+        Material3SettingsGroup(
+            items = listOf(
+                Material3SettingsItem(
+                    icon = painterResource(R.drawable.error),
+                    title = { Text("Diagnostics & Bug Report") },
+                    onClick = { navController.navigate("settings/diagnostics") }
                 )
             )
         )
@@ -491,8 +507,8 @@ fun SettingsScreen(
                 .background(
                     brush = Brush.verticalGradient(
                         colors = listOf(
-                            MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
-                            MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.88f),
                             Color.Transparent
                         )
                     )
@@ -508,6 +524,17 @@ fun SettingsScreen(
                         fontWeight = FontWeight.Bold
                     )
                 )
+            },
+            navigationIcon = {
+                IconButton(
+                    onClick = navController::navigateUp,
+                    onLongClick = navController::backToMain,
+                ) {
+                    androidx.compose.material3.Icon(
+                        painter = painterResource(R.drawable.arrow_back),
+                        contentDescription = null,
+                    )
+                }
             },
             colors = TopAppBarDefaults.topAppBarColors(
                 containerColor = Color.Transparent,

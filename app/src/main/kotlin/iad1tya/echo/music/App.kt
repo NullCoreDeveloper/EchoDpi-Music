@@ -16,17 +16,21 @@ import coil3.request.CachePolicy
 import coil3.request.allowHardware
 import coil3.request.crossfade
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
+import com.echo.innertube.CloudflareDnsResolver
 import com.echo.innertube.YouTube
 import com.echo.innertube.models.YouTubeLocale
 import com.echo.kugou.KuGou
 import iad1tya.echo.music.utils.potoken.AppContextHolder
 import iad1tya.echo.music.BuildConfig
+import iad1tya.echo.music.canvas.ArchiveTuneCanvas
 import iad1tya.echo.music.constants.*
 import com.metrolist.lastfm.LastFM
+import iad1tya.echo.music.canvas.CanvasArtworkPlaybackCache
 import iad1tya.echo.music.di.ApplicationScope
 import iad1tya.echo.music.extensions.toEnum
 import iad1tya.echo.music.extensions.toInetSocketAddress
 import iad1tya.echo.music.utils.CrashHandler
+import iad1tya.echo.music.utils.DiagnosticsLogTree
 import iad1tya.echo.music.utils.dataStore
 import iad1tya.echo.music.utils.get
 import iad1tya.echo.music.utils.reportException
@@ -58,9 +62,12 @@ class App : Application(), SingletonImageLoader.Factory {
 
     override fun onCreate() {
         super.onCreate()
+        CanvasArtworkPlaybackCache.init(filesDir)
+        ArchiveTuneCanvas.initialize(BuildConfig.CANVAS_BEARER_TOKEN)
         AppContextHolder.initialize(this)
         Thread.setDefaultUncaughtExceptionHandler(CrashHandler(applicationContext))
         Timber.plant(Timber.DebugTree())
+        Timber.plant(DiagnosticsLogTree())
 
         // تهيئة إعدادات التطبيق عند الإقلاع
         applicationScope.launch {
@@ -71,6 +78,16 @@ class App : Application(), SingletonImageLoader.Factory {
 
     private suspend fun initializeSettings() {
         val settings = dataStore.data.first()
+
+        // One-time migration: turn SponsorBlock off for all existing users.
+        // Users can enable it again manually afterward.
+        if (settings[SponsorBlockResetV420DoneKey] != true) {
+            dataStore.edit { prefs ->
+                prefs[SponsorBlockEnabledKey] = false
+                prefs[SponsorBlockResetV420DoneKey] = true
+            }
+        }
+
         val locale = Locale.getDefault()
         val languageTag = locale.toLanguageTag().replace("-Hant", "")
         
@@ -94,6 +111,8 @@ class App : Application(), SingletonImageLoader.Factory {
         if (languageTag == "zh-TW") {
             KuGou.useTraditionalChinese = true
         }
+
+        CloudflareDnsResolver.isEnabled = settings[CloudflareDnsEnabledKey] ?: true
 
         if (settings[ProxyEnabledKey] == true) {
             val username = settings[ProxyUsernameKey].orEmpty()
@@ -213,6 +232,15 @@ class App : Application(), SingletonImageLoader.Factory {
                         Timber.e(e, "Could not parse cookie. Clearing existing cookie.")
                         forgetAccount(this@App)
                     }
+                }
+        }
+
+        applicationScope.launch(Dispatchers.IO) {
+            dataStore.data
+                .map { it[CloudflareDnsEnabledKey] ?: true }
+                .distinctUntilChanged()
+                .collect { enabled ->
+                    CloudflareDnsResolver.isEnabled = enabled
                 }
         }
 

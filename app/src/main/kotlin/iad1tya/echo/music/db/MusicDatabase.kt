@@ -548,6 +548,7 @@ val MIGRATION_26_27 =
     object : Migration(26, 27) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL("ALTER TABLE song ADD COLUMN playbackSource INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE lyrics ADD COLUMN provider TEXT NOT NULL DEFAULT 'Unknown'")
         }
     }
 

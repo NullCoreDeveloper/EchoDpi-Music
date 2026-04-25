@@ -2,6 +2,7 @@ package iad1tya.echo.music.ui.menu
 
 import android.content.Intent
 import android.content.res.Configuration
+import android.provider.Settings
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
@@ -76,6 +77,7 @@ import iad1tya.echo.music.LocalDownloadUtil
 import iad1tya.echo.music.LocalPlayerConnection
 import iad1tya.echo.music.LocalSyncUtils
 import iad1tya.echo.music.R
+import iad1tya.echo.music.constants.CrossfadeEnabledKey
 import iad1tya.echo.music.constants.ListItemHeight
 import iad1tya.echo.music.constants.ListThumbnailSize
 import iad1tya.echo.music.db.entities.ArtistEntity
@@ -89,15 +91,18 @@ import iad1tya.echo.music.models.toMediaMetadata
 import iad1tya.echo.music.playback.ExoDownloadService
 import iad1tya.echo.music.playback.queues.YouTubeQueue
 import iad1tya.echo.music.ui.component.ListDialog
+import iad1tya.echo.music.ui.component.AdvancedDownloadDialog
 import iad1tya.echo.music.ui.component.ShareChooserSheet
 import iad1tya.echo.music.ui.component.LocalBottomSheetPageState
 import iad1tya.echo.music.ui.component.NewAction
 import iad1tya.echo.music.ui.component.NewActionGrid
+import iad1tya.echo.music.ui.component.NewMenuSectionHeader
 import iad1tya.echo.music.ui.component.RingtoneTrimDialog
 import iad1tya.echo.music.ui.component.SongListItem
 import iad1tya.echo.music.ui.component.TextFieldDialog
 import iad1tya.echo.music.ui.utils.ShowMediaInfo
 import iad1tya.echo.music.viewmodels.CachePlaylistViewModel
+import iad1tya.echo.music.utils.rememberPreference
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -112,6 +117,7 @@ fun SongMenu(
     playlistBrowseId: String? = null,
     onDismiss: () -> Unit,
     isFromCache: Boolean = false,
+    compactMode: Boolean = false,
 ) {
     val context = LocalContext.current
     val database = LocalDatabase.current
@@ -147,6 +153,20 @@ fun SongMenu(
     var showEditDialog by rememberSaveable {
         mutableStateOf(false)
     }
+    var showAdvancedDownloadDialog by rememberSaveable {
+        mutableStateOf(false)
+    }
+    var showPitchTempoDialog by rememberSaveable {
+        mutableStateOf(false)
+    }
+    var showEqualizerDialog by rememberSaveable {
+        mutableStateOf(false)
+    }
+
+    val (crossfadeEnabled, onCrossfadeEnabledChange) = rememberPreference(
+        CrossfadeEnabledKey,
+        defaultValue = false,
+    )
 
     val TextFieldValueSaver: Saver<TextFieldValue, *> = Saver(
         save = { it.text },
@@ -199,6 +219,21 @@ fun SongMenu(
             },
             onDismiss = { showEditDialog = false }
         )
+    }
+
+    if (showAdvancedDownloadDialog) {
+        AdvancedDownloadDialog(
+            mediaMetadata = song.toMediaMetadata(),
+            onDismiss = { showAdvancedDownloadDialog = false },
+        )
+    }
+
+    if (showPitchTempoDialog) {
+        TempoPitchDialog(onDismiss = { showPitchTempoDialog = false })
+    }
+
+    if (showEqualizerDialog) {
+        EqualizerDialog(onDismiss = { showEqualizerDialog = false })
     }
 
     var showChoosePlaylistDialog by rememberSaveable {
@@ -464,7 +499,288 @@ fun SongMenu(
             bottom = 8.dp + WindowInsets.systemBars.asPaddingValues().calculateBottomPadding(),
         ),
     ) {
-        if (!song.song.isLocal) {
+        if (!compactMode) {
+            item {
+                NewMenuSectionHeader(text = "Downloads & Queue")
+            }
+            item {
+                NewActionGrid(
+                    actions = buildList {
+                        if (!song.song.isLocal) {
+                            add(
+                                NewAction(
+                                    icon = {
+                                        Icon(
+                                            painter = painterResource(R.drawable.download),
+                                            contentDescription = null,
+                                            modifier = Modifier.size(28.dp),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    },
+                                    text = stringResource(R.string.action_download),
+                                    onClick = {
+                                        val downloadRequest =
+                                            DownloadRequest
+                                                .Builder(song.id, song.id.toUri())
+                                                .setCustomCacheKey(song.id)
+                                                .setData(song.song.title.toByteArray())
+                                                .build()
+                                        DownloadService.sendAddDownload(
+                                            context,
+                                            ExoDownloadService::class.java,
+                                            downloadRequest,
+                                            false,
+                                        )
+                                    },
+                                )
+                            )
+                        }
+                        add(
+                            NewAction(
+                                icon = {
+                                    Icon(
+                                        painter = painterResource(R.drawable.playlist_add),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(28.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                },
+                                text = stringResource(R.string.add_to_playlist),
+                                onClick = { showChoosePlaylistDialog = true },
+                            )
+                        )
+                        add(
+                            NewAction(
+                                icon = {
+                                    Icon(
+                                        painter = painterResource(R.drawable.audio_device),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(28.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                },
+                                text = "Audio Output",
+                                onClick = {
+                                    onDismiss()
+                                    bottomSheetPageState.show {
+                                        Text(
+                                            text = "Audio Output",
+                                            style = MaterialTheme.typography.titleLarge,
+                                            fontWeight = FontWeight.SemiBold,
+                                            modifier = Modifier.padding(bottom = 8.dp)
+                                        )
+
+                                        ListItem(
+                                            headlineContent = { Text("This Device") },
+                                            supportingContent = { Text("Play through phone speaker") },
+                                            leadingContent = {
+                                                Icon(
+                                                    painter = painterResource(R.drawable.audio_device),
+                                                    contentDescription = null,
+                                                )
+                                            },
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable {
+                                                    playerConnection.forceAudioToSpeaker(context)
+                                                    bottomSheetPageState.dismiss()
+                                                }
+                                        )
+
+                                        ListItem(
+                                            headlineContent = { Text("Bluetooth") },
+                                            supportingContent = { Text("Try routing playback to connected Bluetooth device") },
+                                            leadingContent = {
+                                                Icon(
+                                                    painter = painterResource(R.drawable.bluetooth),
+                                                    contentDescription = null,
+                                                )
+                                            },
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable {
+                                                    playerConnection.forceAudioToBluetooth(context)
+                                                    bottomSheetPageState.dismiss()
+                                                }
+                                        )
+
+                                        ListItem(
+                                            headlineContent = { Text("System audio settings") },
+                                            supportingContent = { Text("Open Android sound output settings") },
+                                            leadingContent = {
+                                                Icon(
+                                                    painter = painterResource(R.drawable.tune),
+                                                    contentDescription = null,
+                                                )
+                                            },
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable {
+                                                    context.startActivity(Intent(Settings.ACTION_SOUND_SETTINGS))
+                                                    bottomSheetPageState.dismiss()
+                                                }
+                                        )
+                                    }
+                                },
+                            )
+                        )
+                    },
+                    columns = 3,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
+                )
+            }
+        }
+
+        if (!compactMode) {
+            item {
+                NewMenuSectionHeader(text = "Playback & Tools")
+            }
+            item {
+                NewActionGrid(
+                    actions = buildList {
+                        add(
+                            NewAction(
+                                icon = {
+                                    Icon(
+                                        painter = painterResource(R.drawable.radio),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(28.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                },
+                                text = stringResource(R.string.start_radio),
+                                onClick = {
+                                    onDismiss()
+                                    playerConnection.startRadioSeamlessly()
+                                },
+                            )
+                        )
+                        add(
+                            NewAction(
+                                icon = {
+                                    Icon(
+                                        painter = painterResource(R.drawable.waves),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(28.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                },
+                                text = if (crossfadeEnabled) "Disable crossfade" else "Enable crossfade",
+                                onClick = {
+                                    onCrossfadeEnabledChange(!crossfadeEnabled)
+                                },
+                            )
+                        )
+                        if (!song.song.isLocal) {
+                            add(
+                                NewAction(
+                                    icon = {
+                                        Icon(
+                                            painter = painterResource(R.drawable.download),
+                                            contentDescription = null,
+                                            modifier = Modifier.size(28.dp),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    },
+                                    text = "Local Download",
+                                    onClick = {
+                                        showAdvancedDownloadDialog = true
+                                    },
+                                )
+                            )
+                        }
+                        add(
+                            NewAction(
+                                icon = {
+                                    Icon(
+                                        painter = painterResource(R.drawable.notification),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(28.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                },
+                                text = "Set ringtone",
+                                onClick = { showRingtoneTrimDialog = true },
+                            )
+                        )
+                    },
+                    columns = 4,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
+                )
+            }
+
+            item {
+                NewMenuSectionHeader(text = "Equalizer & Advanced")
+            }
+            item {
+                NewActionGrid(
+                    actions = listOf(
+                        NewAction(
+                            icon = {
+                                Icon(
+                                    painter = painterResource(R.drawable.equalizer),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(28.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            },
+                            text = stringResource(R.string.equalizer),
+                            onClick = {
+                                showEqualizerDialog = true
+                            },
+                        ),
+                        NewAction(
+                            icon = {
+                                Icon(
+                                    painter = painterResource(R.drawable.speed),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(28.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            },
+                            text = stringResource(R.string.advanced),
+                            onClick = {
+                                showPitchTempoDialog = true
+                            },
+                        ),
+                    ),
+                    columns = 2,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
+                )
+            }
+
+            item {
+                NewMenuSectionHeader(text = "Listen Together")
+            }
+            item {
+                NewActionGrid(
+                    actions = listOf(
+                        NewAction(
+                            icon = {
+                                Icon(
+                                    painter = painterResource(R.drawable.group_outlined),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(28.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            },
+                            text = "Listen Together",
+                            onClick = {
+                                onDismiss()
+                                navController.navigate("listen_together")
+                            },
+                        ),
+                    ),
+                    columns = 1,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
+                )
+            }
+        }
+
+        if (!compactMode) {
+            item {
+                NewMenuSectionHeader(text = "More")
+            }
             item {
                 NewActionGrid(
                     actions = listOf(
@@ -474,23 +790,11 @@ fun SongMenu(
                                     painter = painterResource(R.drawable.edit),
                                     contentDescription = null,
                                     modifier = Modifier.size(28.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             },
                             text = stringResource(R.string.edit),
-                            onClick = { showEditDialog = true }
-                        ),
-                        NewAction(
-                            icon = {
-                                Icon(
-                                    painter = painterResource(R.drawable.playlist_add),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(28.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            },
-                            text = stringResource(R.string.add_to_playlist),
-                            onClick = { showChoosePlaylistDialog = true }
+                            onClick = { showEditDialog = true },
                         ),
                         NewAction(
                             icon = {
@@ -498,25 +802,13 @@ fun SongMenu(
                                     painter = painterResource(R.drawable.share),
                                     contentDescription = null,
                                     modifier = Modifier.size(28.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             },
                             text = stringResource(R.string.share),
                             onClick = {
                                 showShareSheet = true
-                            }
-                        ),
-                        NewAction(
-                            icon = {
-                                Icon(
-                                    painter = painterResource(R.drawable.notification),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(28.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
                             },
-                            text = "Set ringtone",
-                            onClick = { showRingtoneTrimDialog = true }
                         ),
                         NewAction(
                             icon = {
@@ -529,31 +821,197 @@ fun SongMenu(
                             },
                             text = stringResource(R.string.playback_source),
                             onClick = { showSourceSelectionDialog = true }
-                        )
+                        ),
                     ),
-                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp)
+                    columns = 2,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
                 )
             }
-        } else {
-            // Local songs: show ringtone action in its own grid
+
+            item {
+                NewMenuSectionHeader(text = "Library")
+            }
             item {
                 NewActionGrid(
-                    actions = listOf(
-                        NewAction(
-                            icon = {
+                    actions = buildList {
+                        if (song.song.albumId != null) {
+                            add(
+                                NewAction(
+                                    icon = {
+                                        Icon(
+                                            painter = painterResource(R.drawable.album),
+                                            contentDescription = null,
+                                            modifier = Modifier.size(28.dp),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    },
+                                    text = stringResource(R.string.view_album),
+                                    onClick = {
+                                        onDismiss()
+                                        navController.navigate("album/${song.song.albumId}")
+                                    },
+                                )
+                            )
+                        }
+                        add(
+                            NewAction(
+                                icon = {
+                                    Icon(
+                                        painter = painterResource(R.drawable.artist),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(28.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                },
+                                text = stringResource(R.string.view_artist),
+                                onClick = {
+                                    if (song.artists.size == 1) {
+                                        navController.navigate("artist/${song.artists[0].id}")
+                                        onDismiss()
+                                    } else {
+                                        showSelectArtistDialog = true
+                                    }
+                                },
+                            )
+                        )
+                        add(
+                            NewAction(
+                                icon = {
+                                    Icon(
+                                        painter = painterResource(R.drawable.info),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(28.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                },
+                                text = stringResource(R.string.details),
+                                onClick = {
+                                    onDismiss()
+                                    bottomSheetPageState.show {
+                                        ShowMediaInfo(song.id)
+                                    }
+                                },
+                            )
+                        )
+                    },
+                    columns = 3,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
+                )
+            }
+        }
+
+        if (compactMode) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+                    elevation = CardDefaults.cardElevation(0.dp)
+                ) {
+                    ListItem(
+                        headlineContent = { Text(text = stringResource(R.string.add_to_playlist)) },
+                        leadingContent = {
+                            Icon(
+                                painter = painterResource(R.drawable.playlist_add),
+                                contentDescription = null,
+                            )
+                        },
+                        modifier = Modifier.clickable { showChoosePlaylistDialog = true }
+                    )
+                }
+            }
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+                    elevation = CardDefaults.cardElevation(0.dp)
+                ) {
+                    ListItem(
+                        headlineContent = { Text(text = stringResource(R.string.share)) },
+                        leadingContent = {
+                            Icon(
+                                painter = painterResource(R.drawable.share),
+                                contentDescription = null,
+                            )
+                        },
+                        modifier = Modifier.clickable { showShareSheet = true }
+                    )
+                }
+            }
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+                    elevation = CardDefaults.cardElevation(0.dp)
+                ) {
+                    ListItem(
+                        headlineContent = { Text(text = stringResource(R.string.view_artist)) },
+                        leadingContent = {
+                            Icon(
+                                painter = painterResource(R.drawable.artist),
+                                contentDescription = null,
+                            )
+                        },
+                        modifier = Modifier.clickable {
+                            if (song.artists.size == 1) {
+                                navController.navigate("artist/${song.artists[0].id}")
+                                onDismiss()
+                            } else {
+                                showSelectArtistDialog = true
+                            }
+                        }
+                    )
+                }
+            }
+            if (song.song.albumId != null) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+                        elevation = CardDefaults.cardElevation(0.dp)
+                    ) {
+                        ListItem(
+                            headlineContent = { Text(text = stringResource(R.string.view_album)) },
+                            leadingContent = {
                                 Icon(
-                                    painter = painterResource(R.drawable.notification),
+                                    painter = painterResource(R.drawable.album),
                                     contentDescription = null,
-                                    modifier = Modifier.size(28.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             },
-                            text = "Set ringtone",
-                            onClick = { showRingtoneTrimDialog = true }
+                            modifier = Modifier.clickable {
+                                onDismiss()
+                                navController.navigate("album/${song.song.albumId}")
+                            }
                         )
-                    ),
-                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp)
-                )
+                    }
+                }
+            }
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+                    elevation = CardDefaults.cardElevation(0.dp)
+                ) {
+                    ListItem(
+                        headlineContent = { Text(text = stringResource(R.string.details)) },
+                        leadingContent = {
+                            Icon(
+                                painter = painterResource(R.drawable.info),
+                                contentDescription = null,
+                            )
+                        },
+                        modifier = Modifier.clickable {
+                            onDismiss()
+                            bottomSheetPageState.show {
+                                ShowMediaInfo(song.id)
+                            }
+                        }
+                    )
+                }
             }
         }
 
@@ -830,111 +1288,37 @@ fun SongMenu(
             }
         }
         item {
-            Card(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-                elevation = CardDefaults.cardElevation(0.dp)
-            ) {
-            ListItem(
-                headlineContent = { Text(text = stringResource(R.string.view_artist)) },
-                leadingContent = {
-                    Icon(
-                        painter = painterResource(R.drawable.artist),
-                        contentDescription = null,
-                    )
-                },
-                modifier = Modifier.clickable {
-                    if (song.artists.size == 1) {
-                        navController.navigate("artist/${song.artists[0].id}")
-                        onDismiss()
-                    } else {
-                        showSelectArtistDialog = true
-                    }
-                }
-            )
-            }
-        }
-        if (song.song.albumId != null) {
-            item {
+            if (!song.song.isLocal) {
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
                     elevation = CardDefaults.cardElevation(0.dp)
                 ) {
-                ListItem(
-                    headlineContent = { Text(text = stringResource(R.string.view_album)) },
-                    leadingContent = {
-                        Icon(
-                            painter = painterResource(R.drawable.album),
-                            contentDescription = null,
-                        )
-                    },
-                    modifier = Modifier.clickable {
-                        onDismiss()
-                        navController.navigate("album/${song.song.albumId}")
-                    }
-                )
-                }
-            }
-        }
-        if (!song.song.isLocal) {
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-                    elevation = CardDefaults.cardElevation(0.dp)
-                ) {
-                ListItem(
-                    headlineContent = { Text(text = stringResource(R.string.refetch)) },
-                    leadingContent = {
-                        Icon(
-                            painter = painterResource(R.drawable.sync),
-                            contentDescription = null,
-                            modifier = Modifier.graphicsLayer(rotationZ = rotationAnimation),
-                        )
-                    },
-                    modifier = Modifier.clickable {
-                        refetchIconDegree -= 360
-                        scope.launch(Dispatchers.IO) {
-                            YouTube.queue(listOf(song.id)).onSuccess {
-                                val newSong = it.firstOrNull()
-                                if (newSong != null) {
-                                    database.transaction {
-                                        update(song, newSong.toMediaMetadata())
+                    ListItem(
+                        headlineContent = { Text(text = stringResource(R.string.refetch)) },
+                        leadingContent = {
+                            Icon(
+                                painter = painterResource(R.drawable.sync),
+                                contentDescription = null,
+                                modifier = Modifier.graphicsLayer(rotationZ = rotationAnimation),
+                            )
+                        },
+                        modifier = Modifier.clickable {
+                            refetchIconDegree -= 360
+                            scope.launch(Dispatchers.IO) {
+                                YouTube.queue(listOf(song.id)).onSuccess {
+                                    val newSong = it.firstOrNull()
+                                    if (newSong != null) {
+                                        database.transaction {
+                                            update(song, newSong.toMediaMetadata())
+                                        }
                                     }
                                 }
                             }
                         }
-                    }
-                )
-                }
-            }
-        }
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-                elevation = CardDefaults.cardElevation(0.dp)
-            ) {
-            ListItem(
-                headlineContent = { Text(text = stringResource(R.string.details)) },
-                leadingContent = {
-                    Icon(
-                        painter = painterResource(R.drawable.info),
-                        contentDescription = null,
                     )
-                },
-                modifier = Modifier.clickable {
-                    onDismiss()
-                    bottomSheetPageState.show {
-                        ShowMediaInfo(song.id)
-                    }
                 }
-            )
             }
         }
     }

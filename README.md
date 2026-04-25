@@ -22,13 +22,30 @@
 
 ---
 
-## 🆕 Что нового в v1.0.2:
+## 🆕 Что нового (Echo Music v4.2.2 + DPI):
 
-- **Полноценный офлайн-режим**: Исправлена проблема, когда скачанные песни не играли без интернета. Теперь плеер использует локальный кэш напрямую, минуя запросы к YouTube.
-- **Стабильность плейлистов**: Устранены фризы и зависания приложения при скачивании больших плейлистов. Оптимизирован поток обновлений интерфейса.
-- **Исправление удаления**: Фикс бага, из-за которого удаленные песни могли оставаться в памяти устройства.
-- **Корректные источники**: Исправлено переключение между YouTube и YouTube Music. Метка `[YT]` теперь отображается правильно.
-- **Повышение надежности**: Устранены критические ошибки (`Deadlocks`, `IllegalArgumentException`), вызывавшие периодические вылеты приложения.
+### Основные обновления оригинала:
+- **Completely redesigned UI** — Cleaner and faster experience from the ground up.
+- **Import from Spotify** — Bring your playlists and tracks over with ease.
+- **Listen Together** - allows users to sync music in real time, similar to Spotify Jam.
+- **Podcast support** — Listen to podcasts alongside your music library.
+- **Local media support** — Play music stored directly on your device.
+- **Auto data migration** — Seamlessly move existing app data to the new version.
+- **Android Dynamic Island support** — Enhanced playback notifications on supported devices.
+
+### Потоковая передача и воспроизведение:
+- **Ad-Free** — Stream without interruptions.
+- **Seamless Playback** — Switch effortlessly between audio-only and video modes.
+- **Background Playback** — Listen while using other apps or with the screen off.
+- **Offline Mode** — Download tracks, albums, and playlists via a dedicated download manager.
+- **Crossfade** — Smooth transitions between tracks.
+- **Canvas Animations** — Visual animations while playing music.
+
+### Lyrics & Discovery:
+- **Echo Find** — Identify songs playing around you using advanced audio recognition.
+- **Smart Recommendations** — Personalized suggestions based on your listening history.
+- **Multiple lyrics animations** — Choose from various lyric display styles.
+- **AI lyrics translation** — Built-in Google Translate integration.
 
 ---
 
@@ -49,6 +66,22 @@ cd EchoDpi-Music
 
 ---
 
+## Community & Support
+
+Join the community for updates, discussions, and help.
+
+<div align="center">
+  <a href="https://discord.gg/EcfV3AxH5c"><img src="assets/discord.png" width="140"/></a>
+  &nbsp;
+  <a href="https://t.me/EchoMusicApp"><img src="assets/telegram.png" width="130"/></a>
+</div>
+
+---
+
 ## ⚖️ Лицензия
 
 Проект распространяется под той же лицензией, что и кодовая база оригинала — <a href="LICENSE">GPL-3.0</a>. Отдельная благодарность разработчику оригинального [Echo Music](https://github.com/iad1tya/Echo-Music).
+
+<div align="center">
+  Licensed under <a href="LICENSE">GPL-3.0</a>
+</div>

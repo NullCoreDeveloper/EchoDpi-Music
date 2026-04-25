@@ -48,6 +48,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
@@ -84,8 +86,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
@@ -105,10 +109,10 @@ import iad1tya.echo.music.LocalPlayerConnection
 import iad1tya.echo.music.R
 import iad1tya.echo.music.constants.CrossfadeEnabledKey
 import iad1tya.echo.music.constants.ListItemHeight
-import iad1tya.echo.music.constants.UseNewPlayerDesignKey
 import iad1tya.echo.music.constants.PlayerButtonsStyle
 import iad1tya.echo.music.constants.PlayerButtonsStyleKey
 import iad1tya.echo.music.constants.QueueEditLockKey
+import iad1tya.echo.music.constants.UseNewPlayerDesignKey
 import iad1tya.echo.music.extensions.metadata
 import iad1tya.echo.music.extensions.move
 import iad1tya.echo.music.extensions.togglePlayPause
@@ -147,6 +151,7 @@ fun Queue(
     textButtonColor: Color,
     iconButtonColor: Color,
     onShowLyrics: () -> Unit = {},
+    onShowAudioOutput: () -> Unit = {},
     pureBlack: Boolean,
 ) {
     val context = LocalContext.current
@@ -177,8 +182,8 @@ fun Queue(
 
     var locked by rememberPreference(QueueEditLockKey, defaultValue = false)
 
-    val (useNewPlayerDesign, onUseNewPlayerDesignChange) = rememberPreference(
-        UseNewPlayerDesignKey,
+    val useNewPlayerDesign by rememberPreference(
+        key = UseNewPlayerDesignKey,
         defaultValue = true
     )
 
@@ -329,15 +334,17 @@ fun Queue(
                             .size(buttonSize)
                             .clip(RoundedCornerShape(5.dp))
                             .border(1.dp, borderColor, RoundedCornerShape(5.dp))
-                            .clickable { onCrossfadeEnabledChange(!crossfadeEnabled) },
+                            .clickable {
+                                playerConnection.player.shuffleModeEnabled = !playerConnection.player.shuffleModeEnabled
+                            },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            painter = painterResource(id = R.drawable.waves),
+                            painter = painterResource(id = R.drawable.shuffle),
                             contentDescription = null,
                             modifier = Modifier
                                 .size(iconSize)
-                                .alpha(if (crossfadeEnabled) 1f else 0.5f),
+                                .alpha(if (playerConnection.player.shuffleModeEnabled) 1f else 0.5f),
                             tint = TextBackgroundColor
                         )
                     }
@@ -397,6 +404,7 @@ fun Queue(
                                         mediaMetadata = mediaMetadata,
                                         navController = navController,
                                         playerBottomSheetState = playerBottomSheetState,
+                                        onShowAudioOutput = onShowAudioOutput,
                                         onShowDetailsDialog = {
                                             mediaMetadata?.id?.let {
                                                 bottomSheetPageState.show {
@@ -613,6 +621,9 @@ fun Queue(
         val headerItems = 1
         val lazyListState = rememberLazyListState()
         var dragInfo by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+        var topOverlayHeightPx by remember { mutableStateOf(0) }
+        val density = LocalDensity.current
+        val queueListTopPadding = with(density) { topOverlayHeightPx.toDp() + 8.dp }
 
         val reorderableState = rememberReorderableLazyListState(
             lazyListState = lazyListState,
@@ -685,7 +696,7 @@ fun Queue(
                 WindowInsets.systemBars
                     .add(
                         WindowInsets(
-                            top = ListItemHeight + 8.dp,
+                            top = queueListTopPadding,
                             bottom = ListItemHeight + 8.dp,
                         ),
                     ).asPaddingValues(),
@@ -749,9 +760,18 @@ fun Queue(
                         }
 
                         val content: @Composable () -> Unit = {
-                            Row(
-                                horizontalArrangement = Arrangement.Center,
-                                modifier = Modifier.animateItem(),
+                            Card(
+                                shape = RoundedCornerShape(24.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = when {
+                                        index == currentWindowIndex -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.92f)
+                                        selection && window.mediaItem.metadata!! in selectedSongs -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.92f)
+                                        else -> MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.92f)
+                                    },
+                                ),
+                                modifier = Modifier
+                                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                                    .animateItem(),
                             ) {
                                 MediaMetadataListItem(
                                     mediaMetadata = window.mediaItem.metadata!!,
@@ -766,6 +786,7 @@ fun Queue(
                                                         mediaMetadata = window.mediaItem.metadata!!,
                                                         navController = navController,
                                                         playerBottomSheetState = playerBottomSheetState,
+                                                        onShowAudioOutput = onShowAudioOutput,
                                                         isQueueTrigger = true,
                                                         onShowDetailsDialog = {
                                                             window.mediaItem.mediaId.let {
@@ -796,10 +817,8 @@ fun Queue(
                                             }
                                         }
                                     },
-                                    modifier =
-                                    Modifier
+                                    modifier = Modifier
                                         .fillMaxWidth()
-                                        .background(background)
                                         .combinedClickable(
                                             onClick = {
                                                 if (selection) {
@@ -826,8 +845,8 @@ fun Queue(
                                                 if (!selection) {
                                                     selection = true
                                                 }
-                                                selectedSongs.clear() // Clear all selections
-                                                selectedSongs.add(window.mediaItem.metadata!!) // Select current item
+                                                selectedSongs.clear()
+                                                selectedSongs.add(window.mediaItem.metadata!!)
                                             },
                                         ),
                                 )
@@ -865,8 +884,14 @@ fun Queue(
                         items = automix,
                         key = { _, it -> it.mediaId },
                     ) { index, item ->
-                        Row(
-                            horizontalArrangement = Arrangement.Center,
+                        Card(
+                            shape = RoundedCornerShape(24.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.92f),
+                            ),
+                            modifier = Modifier
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                                .animateItem(),
                         ) {
                             MediaMetadataListItem(
                                 mediaMetadata = item.metadata!!,
@@ -898,8 +923,7 @@ fun Queue(
                                         )
                                     }
                                 },
-                                modifier =
-                                Modifier
+                                modifier = Modifier
                                     .fillMaxWidth()
                                     .combinedClickable(
                                         onClick = {},
@@ -909,6 +933,7 @@ fun Queue(
                                                     mediaMetadata = item.metadata!!,
                                                     navController = navController,
                                                     playerBottomSheetState = playerBottomSheetState,
+                                                    onShowAudioOutput = onShowAudioOutput,
                                                     isQueueTrigger = true,
                                                     onShowDetailsDialog = {
                                                         item.mediaId.let {
@@ -921,8 +946,7 @@ fun Queue(
                                                 )
                                             }
                                         },
-                                    )
-                                    .animateItem(),
+                                    ),
                             )
                         }
                     }
@@ -934,67 +958,87 @@ fun Queue(
             modifier =
             Modifier
                 .background(
-                    if (pureBlack) Color.Black
-                    else MaterialTheme.colorScheme
-                        .secondaryContainer
-                        .copy(alpha = 0.90f),
+                    if (pureBlack) {
+                        Color(0xFF121212)
+                    } else {
+                        MaterialTheme.colorScheme.surfaceContainerHigh
+                    },
                 )
                 .windowInsetsPadding(
                     WindowInsets.systemBars
                         .only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
-                ),
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                modifier =
-                Modifier
-                    .height(ListItemHeight)
-                    .padding(horizontal = 12.dp),
-            ) {
-                Text(
-                    text = queueTitle.orEmpty(),
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
                 )
-
-                AnimatedVisibility(
-                    visible = !selection,
-                    enter = fadeIn() + slideInVertically { it },
-                    exit = fadeOut() + slideOutVertically { it },
+                .onSizeChanged { topOverlayHeightPx = it.height },
+        ) {
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (pureBlack) {
+                        Color(0xFF121212)
+                    } else {
+                        MaterialTheme.colorScheme.surfaceContainerHigh
+                    },
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 16.dp),
                 ) {
-                    Row {
-                        IconButton(
-                            onClick = { locked = !locked },
-                            modifier = Modifier.padding(horizontal = 6.dp),
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(3.dp),
                         ) {
-                            Icon(
-                                painter = painterResource(if (locked) R.drawable.lock else R.drawable.lock_open),
-                                contentDescription = null,
+                            Text(
+                                text = stringResource(R.string.queue),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
+                                text = queueTitle.orEmpty(),
+                                style = MaterialTheme.typography.titleLarge,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
                             )
                         }
                     }
-                }
 
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                    horizontalAlignment = Alignment.End,
-                ) {
-                    Text(
-                        text = pluralStringResource(
-                            R.plurals.n_song,
-                            queueWindows.size,
-                            queueWindows.size
-                        ),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
+                    Spacer(Modifier.height(14.dp))
 
-                    Text(
-                        text = makeTimeString(queueLength * 1000L),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        QueueStatChip(
+                            label = pluralStringResource(R.plurals.n_song, queueWindows.size, queueWindows.size),
+                        )
+                        QueueStatChip(
+                            label = makeTimeString(queueLength * 1000L),
+                        )
+                        Spacer(Modifier.weight(1f))
+                        AnimatedVisibility(
+                            visible = !selection,
+                            enter = fadeIn() + slideInVertically { it },
+                            exit = fadeOut() + slideOutVertically { it },
+                        ) {
+                            IconButton(
+                                onClick = { locked = !locked },
+                            ) {
+                                Icon(
+                                    painter = painterResource(if (locked) R.drawable.lock else R.drawable.lock_open),
+                                    contentDescription = null,
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
@@ -1006,7 +1050,8 @@ fun Queue(
                 Row(
                     modifier =
                     Modifier
-                        .height(48.dp),
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                        .height(52.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     val count = selectedSongs.size
@@ -1081,16 +1126,21 @@ fun Queue(
         }
 
         val shuffleModeEnabled by playerConnection.shuffleModeEnabled.collectAsState()
+        val bottomPanelColor = if (pureBlack) {
+            Color(0xFF121212)
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerHigh
+        }
+        val controlTileColor = if (pureBlack) {
+            Color(0xFF1C1C1C)
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerHighest
+        }
 
         Box(
             modifier =
             Modifier
-                .background(
-                    if (pureBlack) Color.Black
-                    else MaterialTheme.colorScheme
-                        .secondaryContainer
-                        .copy(alpha = 0.90f),
-                )
+                .background(bottomPanelColor)
                 .fillMaxWidth()
                 .height(
                     ListItemHeight +
@@ -1099,58 +1149,90 @@ fun Queue(
                                 .calculateBottomPadding(),
                 )
                 .align(Alignment.BottomCenter)
-                .clickable {
-                    state.collapseSoft()
-                }
                 .windowInsetsPadding(
                     WindowInsets.systemBars
                         .only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal),
                 )
                 .padding(12.dp),
         ) {
-            IconButton(
-                modifier = Modifier.align(Alignment.CenterStart),
-                onClick = {
-                    coroutineScope
-                        .launch {
-                            lazyListState.animateScrollToItem(
-                                if (playerConnection.player.shuffleModeEnabled) playerConnection.player.currentMediaItemIndex else 0,
-                            )
-                        }.invokeOnCompletion {
-                            playerConnection.player.shuffleModeEnabled =
-                                !playerConnection.player.shuffleModeEnabled
-                        }
-                },
+            Row(
+                modifier = Modifier.fillMaxSize(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    painter = painterResource(R.drawable.shuffle),
-                    contentDescription = null,
-                    modifier = Modifier.alpha(if (shuffleModeEnabled) 1f else 0.5f),
-                )
-            }
-
-            Icon(
-                painter = painterResource(R.drawable.expand_more),
-                contentDescription = null,
-                modifier = Modifier.align(Alignment.Center),
-            )
-
-            IconButton(
-                modifier = Modifier.align(Alignment.CenterEnd),
-                onClick = playerConnection.player::toggleRepeatMode,
-            ) {
-                Icon(
-                    painter =
-                    painterResource(
-                        when (repeatMode) {
-                            Player.REPEAT_MODE_OFF, Player.REPEAT_MODE_ALL -> R.drawable.repeat
-                            Player.REPEAT_MODE_ONE -> R.drawable.repeat_one
-                            else -> throw IllegalStateException()
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(controlTileColor)
+                        .clickable {
+                            coroutineScope
+                                .launch {
+                                    lazyListState.animateScrollToItem(
+                                        if (playerConnection.player.shuffleModeEnabled) {
+                                            playerConnection.player.currentMediaItemIndex
+                                        } else {
+                                            0
+                                        },
+                                    )
+                                }.invokeOnCompletion {
+                                    playerConnection.player.shuffleModeEnabled =
+                                        !playerConnection.player.shuffleModeEnabled
+                                }
                         },
-                    ),
-                    contentDescription = null,
-                    modifier = Modifier.alpha(if (repeatMode == Player.REPEAT_MODE_OFF) 0.5f else 1f),
-                )
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.shuffle),
+                        contentDescription = null,
+                        modifier = Modifier.alpha(if (shuffleModeEnabled) 1f else 0.5f),
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .height(42.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(controlTileColor)
+                        .clickable { state.collapseSoft() }
+                        .padding(horizontal = 16.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.queue_music),
+                            contentDescription = null,
+                        )
+                        Icon(
+                            painter = painterResource(R.drawable.expand_more),
+                            contentDescription = null,
+                        )
+                    }
+                }
+
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(controlTileColor)
+                        .clickable { playerConnection.player.toggleRepeatMode() },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        painter = painterResource(
+                            when (repeatMode) {
+                                Player.REPEAT_MODE_OFF, Player.REPEAT_MODE_ALL -> R.drawable.repeat
+                                Player.REPEAT_MODE_ONE -> R.drawable.repeat_one
+                                else -> throw IllegalStateException()
+                            },
+                        ),
+                        contentDescription = null,
+                        modifier = Modifier.alpha(if (repeatMode == Player.REPEAT_MODE_OFF) 0.5f else 1f),
+                    )
+                }
             }
         }
 
@@ -1166,6 +1248,34 @@ fun Queue(
                                 .calculateBottomPadding(),
                 )
                 .align(Alignment.BottomCenter),
+        )
+    }
+}
+
+@Composable
+private fun QueueStatChip(
+    label: String,
+    highlighted: Boolean = false,
+) {
+    Card(
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (highlighted) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                MaterialTheme.colorScheme.surfaceContainerHigh
+            },
+        ),
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.titleSmall,
+            color = if (highlighted) {
+                MaterialTheme.colorScheme.onPrimaryContainer
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
         )
     }
 }

@@ -60,6 +60,9 @@ fun RomanizationSettings(
 
     val (lyricsRomanizeJapanese, onLyricsRomanizeJapaneseChange) = rememberPreference(LyricsRomanizeJapaneseKey, defaultValue = true)
     val (lyricsRomanizeKorean, onLyricsRomanizeKoreanChange) = rememberPreference(LyricsRomanizeKoreanKey, defaultValue = true)
+    val (lyricsRomanizeChinese, onLyricsRomanizeChineseChange) = rememberPreference(LyricsRomanizeChineseKey, defaultValue = true)
+    val (lyricsRomanizeHindi, onLyricsRomanizeHindiChange) = rememberPreference(LyricsRomanizeHindiKey, defaultValue = true)
+    val (lyricsRomanizeOtherLanguages, onLyricsRomanizeOtherLanguagesChange) = rememberPreference(LyricsRomanizeOtherLanguagesKey, defaultValue = true)
     val (lyricsRomanizeRussian, onLyricsRomanizeRussianChange) = rememberPreference(LyricsRomanizeRussianKey, defaultValue = true)
     val (lyricsRomanizeUkrainian, onLyricsRomanizeUkrainianChange) = rememberPreference(LyricsRomanizeUkrainianKey, defaultValue = true)
     val (lyricsRomanizeSerbian, onLyricsRomanizeSerbianChange) = rememberPreference(LyricsRomanizeSerbianKey, defaultValue = true)
@@ -91,7 +94,27 @@ fun RomanizationSettings(
             onCheckedChange = onLyricsRomanizeKoreanChange,
         )
 
-        PreferenceGroupTitle(title = stringResource(R.string.lyrics_romanization_cyrillic))
+        SwitchPreference(
+            title = { Text(stringResource(R.string.lyrics_romanize_chinese)) },
+            icon = { Icon(painterResource(R.drawable.lyrics), null) },
+            checked = lyricsRomanizeChinese,
+            onCheckedChange = onLyricsRomanizeChineseChange,
+        )
+
+        SwitchPreference(
+            title = { Text(stringResource(R.string.lyrics_romanize_hindi)) },
+            icon = { Icon(painterResource(R.drawable.lyrics), null) },
+            checked = lyricsRomanizeHindi,
+            onCheckedChange = onLyricsRomanizeHindiChange,
+        )
+
+        SwitchPreference(
+            title = { Text(stringResource(R.string.lyrics_romanize_other_languages)) },
+            icon = { Icon(painterResource(R.drawable.lyrics), null) },
+            checked = lyricsRomanizeOtherLanguages,
+            onCheckedChange = onLyricsRomanizeOtherLanguagesChange,
+        )
+
         SwitchPreference(
             title = { Text(stringResource(R.string.lyrics_romanize_russian)) },
             icon = { Icon(painterResource(R.drawable.alphabet_cyrillic), null) },

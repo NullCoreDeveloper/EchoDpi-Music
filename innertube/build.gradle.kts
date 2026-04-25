@@ -29,8 +29,8 @@ dependencies {
     implementation(libs.ktor.client.content.negotiation)
     implementation(libs.ktor.serialization.json)
     implementation(libs.ktor.client.encoding)
+    implementation("com.squareup.okhttp3:okhttp-dnsoverhttps:4.12.0")
     implementation(libs.brotli)
-    
     // Extractor dependencies (local source)
     implementation(libs.nanojson)
     implementation(libs.jsoup)
@@ -45,6 +45,5 @@ dependencies {
     implementation(libs.rhino)
     implementation("commons-codec:commons-codec:1.16.0")
     implementation(libs.wire.runtime)
-
     testImplementation(libs.junit)
 }

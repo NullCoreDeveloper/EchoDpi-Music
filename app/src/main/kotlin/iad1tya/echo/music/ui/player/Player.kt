@@ -42,8 +42,10 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -95,10 +97,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -125,10 +129,15 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
+import androidx.core.net.toUri
 import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.common.Player.STATE_ENDED
 import androidx.media3.common.Player.STATE_READY
+import androidx.media3.exoplayer.offline.Download
+import androidx.media3.exoplayer.offline.DownloadRequest
+import androidx.media3.exoplayer.offline.DownloadService
+import androidx.media3.exoplayer.source.ShuffleOrder.DefaultShuffleOrder
 import androidx.palette.graphics.Palette
 import androidx.navigation.NavController
 import coil3.compose.AsyncImage
@@ -140,7 +149,6 @@ import iad1tya.echo.music.LocalDownloadUtil
 import iad1tya.echo.music.LocalPlayerConnection
 import iad1tya.echo.music.R
 import iad1tya.echo.music.constants.DarkModeKey
-import iad1tya.echo.music.constants.UseNewPlayerDesignKey
 import iad1tya.echo.music.constants.PlayerBackgroundStyle
 import iad1tya.echo.music.constants.PlayerBackgroundStyleKey
 import iad1tya.echo.music.constants.PlayerButtonsStyle
@@ -152,6 +160,7 @@ import iad1tya.echo.music.constants.ThumbnailCornerRadius
 import iad1tya.echo.music.constants.QueuePeekHeight
 import iad1tya.echo.music.constants.SliderStyle
 import iad1tya.echo.music.constants.SliderStyleKey
+import iad1tya.echo.music.constants.UseNewPlayerDesignKey
 import iad1tya.echo.music.extensions.togglePlayPause
 import iad1tya.echo.music.extensions.toggleRepeatMode
 import iad1tya.echo.music.models.MediaMetadata
@@ -169,6 +178,7 @@ import iad1tya.echo.music.LocalDatabase
 import iad1tya.echo.music.db.entities.LyricsEntity
 import iad1tya.echo.music.ui.menu.LyricsMenu
 import iad1tya.echo.music.ui.menu.PlayerMenu
+import iad1tya.echo.music.playback.ExoDownloadService
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.ui.text.style.TextAlign
 import dagger.hilt.android.EntryPointAccessors
@@ -176,10 +186,7 @@ import iad1tya.echo.music.ui.screens.settings.DarkMode
 import iad1tya.echo.music.ui.utils.ShowMediaInfo
 import iad1tya.echo.music.utils.makeTimeString
 import iad1tya.echo.music.utils.rememberEnumPreference
-import iad1tya.echo.music.utils.dataStore
 import iad1tya.echo.music.utils.rememberPreference
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -187,6 +194,27 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import me.saket.squiggles.SquigglySlider
 import kotlin.math.roundToInt
+
+private fun Modifier.tvFocusableHighlight(shape: RoundedCornerShape): Modifier = composed {
+    val context = LocalContext.current
+    val isTvDevice = remember(context) {
+        context.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
+    }
+    var isFocused by remember { mutableStateOf(false) }
+
+    if (isTvDevice) {
+        this
+            .focusable()
+            .onFocusChanged { isFocused = it.isFocused }
+            .border(
+                width = if (isFocused) 2.dp else 0.dp,
+                color = if (isFocused) MaterialTheme.colorScheme.primary else Color.Transparent,
+                shape = shape
+            )
+    } else {
+        this
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -203,16 +231,9 @@ fun BottomSheetPlayer(
     val bottomSheetPageState = LocalBottomSheetPageState.current
     val playerConnection = LocalPlayerConnection.current ?: return
 
-    // Read synchronously once so the very first frame already uses the correct design,
-    // preventing the flash of old UI before DataStore emits (e.g. returning from ambient mode).
-    val useNewPlayerDesignDefault = remember {
-        runBlocking(Dispatchers.IO) {
-            context.dataStore.data.first()[UseNewPlayerDesignKey] ?: true
-        }
-    }
-    val (useNewPlayerDesign, onUseNewPlayerDesignChange) = rememberPreference(
-        UseNewPlayerDesignKey,
-        defaultValue = useNewPlayerDesignDefault
+    val useNewPlayerDesign by rememberPreference(
+        key = UseNewPlayerDesignKey,
+        defaultValue = true
     )
     val playerBackground by rememberEnumPreference(
         key = PlayerBackgroundStyleKey,
@@ -777,6 +798,7 @@ fun BottomSheetPlayer(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(textButtonColor)
+                                .tvFocusableHighlight(RoundedCornerShape(12.dp))
                                 .clickable {
                                     // Pause the current song before switching to video
                                     playerConnection.player.pause()
@@ -939,6 +961,7 @@ fun BottomSheetPlayer(
                             .size(40.dp)
                             .clip(RoundedCornerShape(24.dp))
                             .background(textButtonColor)
+                            .tvFocusableHighlight(RoundedCornerShape(24.dp))
                             .clickable {
                                 menuState.show {
                                     LyricsMenu(
@@ -976,57 +999,69 @@ fun BottomSheetPlayer(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.padding(top = if (mediaMetadata.id.isNotEmpty()) 48.dp else 8.dp)
                         ) {
+                            val isLocalSong = currentSong?.song?.isLocal == true
                             Box(
                                 modifier = Modifier
                                     .size(42.dp)
                                     .clip(audioRoutingShape)
                                     .background(textButtonColor)
-                                    .clickable {
-                                        audioRoutingSheetState.expandSoft()
+                                    .tvFocusableHighlight(audioRoutingShape)
+                                    .clickable(enabled = !isLocalSong) {
+                                        when (download?.state) {
+                                            Download.STATE_COMPLETED,
+                                            Download.STATE_QUEUED,
+                                            Download.STATE_DOWNLOADING -> {
+                                                DownloadService.sendRemoveDownload(
+                                                    context,
+                                                    ExoDownloadService::class.java,
+                                                    mediaMetadata.id,
+                                                    false,
+                                                )
+                                            }
+                                            else -> {
+                                                if (mediaMetadata.id.isNotBlank()) {
+                                                    val downloadRequest =
+                                                        DownloadRequest
+                                                            .Builder(mediaMetadata.id, mediaMetadata.id.toUri())
+                                                            .setCustomCacheKey(mediaMetadata.id)
+                                                            .setData(mediaMetadata.title.toByteArray())
+                                                            .build()
+                                                    DownloadService.sendAddDownload(
+                                                        context,
+                                                        ExoDownloadService::class.java,
+                                                        downloadRequest,
+                                                        false,
+                                                    )
+                                                }
+                                            }
+                                        }
                                     }
                             ) {
-                                // Detect cast / audio device state
-                                val isCastingLocal = playerConnection.service.castConnectionHandler
-                                    ?.isCasting?.collectAsState()?.value ?: false
-                                val audioManager = try {
-                                    context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
-                                } catch (e: Exception) {
-                                    null
+                                if (download?.state == Download.STATE_QUEUED || download?.state == Download.STATE_DOWNLOADING) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier
+                                            .align(Alignment.Center)
+                                            .size(18.dp),
+                                        strokeWidth = 2.dp,
+                                        color = iconButtonColor,
+                                    )
+                                } else {
+                                    Image(
+                                        painter = painterResource(
+                                            if (download?.state == Download.STATE_COMPLETED) {
+                                                R.drawable.offline
+                                            } else {
+                                                R.drawable.download
+                                            }
+                                        ),
+                                        contentDescription = null,
+                                        colorFilter = ColorFilter.tint(iconButtonColor),
+                                        modifier = Modifier
+                                            .align(Alignment.Center)
+                                            .size(24.dp)
+                                            .alpha(if (isLocalSong) 0.4f else 1f)
+                                    )
                                 }
-                                val devices = try {
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && audioManager != null) {
-                                        audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).toList()
-                                    } else {
-                                        emptyList()
-                                    }
-                                } catch (e: Exception) {
-                                    emptyList()
-                                }
-                                val hasBluetoothDevice = devices.any {
-                                    it.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
-                                    it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO
-                                }
-                                val hasWiredHeadset = devices.any {
-                                    it.type == AudioDeviceInfo.TYPE_WIRED_HEADSET ||
-                                    it.type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES
-                                }
-
-                                // Choose icon based on active output
-                                val audioIcon = when {
-                                    isCastingLocal -> R.drawable.cast_connected
-                                    hasBluetoothDevice -> R.drawable.audio_bluetooth
-                                    hasWiredHeadset -> R.drawable.audio_earphone
-                                    else -> R.drawable.audio_device
-                                }
-
-                                Image(
-                                    painter = painterResource(audioIcon),
-                                    contentDescription = null,
-                                    colorFilter = ColorFilter.tint(iconButtonColor),
-                                    modifier = Modifier
-                                        .align(Alignment.Center)
-                                        .size(24.dp)
-                                )
                             }
 
                             Box(
@@ -1034,6 +1069,7 @@ fun BottomSheetPlayer(
                                     .size(42.dp)
                                     .clip(favShape)
                                     .background(textButtonColor)
+                                    .tvFocusableHighlight(favShape)
                                     .clickable {
                                         playerConnection.toggleLike()
                                     }
@@ -1057,6 +1093,7 @@ fun BottomSheetPlayer(
                                     .size(42.dp)
                                     .clip(shareShape)
                                     .background(textButtonColor)
+                                    .tvFocusableHighlight(shareShape)
                                     .clickable {
                                         showShareSheet = true
                                     }
@@ -1078,46 +1115,13 @@ fun BottomSheetPlayer(
                                 .size(40.dp)
                                 .clip(RoundedCornerShape(24.dp))
                                 .background(textButtonColor)
+                                .tvFocusableHighlight(RoundedCornerShape(24.dp))
                                 .clickable {
-                                    audioRoutingSheetState.expandSoft()
+                                    showShareSheet = true
                                 },
                         ) {
-                            // Detect cast / audio device state
-                            val isCastingLocal = playerConnection.service.castConnectionHandler
-                                ?.isCasting?.collectAsState()?.value ?: false
-                            val audioManager = try {
-                                context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
-                            } catch (e: Exception) {
-                                null
-                            }
-                            val devices = try {
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && audioManager != null) {
-                                    audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).toList()
-                                } else {
-                                    emptyList()
-                                }
-                            } catch (e: Exception) {
-                                emptyList()
-                            }
-                            val hasBluetoothDevice = devices.any {
-                                it.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
-                                it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO
-                            }
-                            val hasWiredHeadset = devices.any {
-                                it.type == AudioDeviceInfo.TYPE_WIRED_HEADSET ||
-                                it.type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES
-                            }
-
-                            // Choose icon based on active output
-                            val audioIcon = when {
-                                isCastingLocal -> R.drawable.cast_connected
-                                hasBluetoothDevice -> R.drawable.audio_bluetooth
-                                hasWiredHeadset -> R.drawable.audio_earphone
-                                else -> R.drawable.audio_device
-                            }
-
                             Image(
-                                painter = painterResource(audioIcon),
+                                painter = painterResource(R.drawable.share),
                                 contentDescription = null,
                                 colorFilter = ColorFilter.tint(iconButtonColor),
                                 modifier = Modifier
@@ -1128,6 +1132,49 @@ fun BottomSheetPlayer(
 
                         Spacer(modifier = Modifier.size(6.dp))
 
+                            Box(
+                                modifier = Modifier
+                                    .padding(top = if (mediaMetadata.id.isNotEmpty()) 48.dp else 8.dp)
+                                    .size(40.dp)
+                                    .clip(RoundedCornerShape(24.dp))
+                                    .background(textButtonColor)
+                                    .tvFocusableHighlight(RoundedCornerShape(24.dp))
+                                    .clickable {
+                                        val mediaItemCount = playerConnection.player.mediaItemCount
+                                        if (mediaItemCount > 0) {
+                                            val currentIndex = playerConnection.player.currentMediaItemIndex
+                                            if (currentIndex !in 0 until mediaItemCount) return@clickable
+
+                                            val shuffledIndices = IntArray(mediaItemCount) { it }
+                                            shuffledIndices.shuffle()
+
+                                            val currentPos = shuffledIndices.indexOf(currentIndex)
+                                            if (currentPos > 0) {
+                                                shuffledIndices[currentPos] = shuffledIndices[0]
+                                                shuffledIndices[0] = currentIndex
+                                            }
+
+                                            // Shuffle queue traversal order while keeping the current song playing.
+                                            playerConnection.player.shuffleModeEnabled = true
+                                            playerConnection.player.setShuffleOrder(
+                                                DefaultShuffleOrder(shuffledIndices, System.currentTimeMillis())
+                                            )
+                                        }
+                                    },
+                            ) {
+                                Image(
+                                    painter = painterResource(R.drawable.shuffle),
+                                    contentDescription = null,
+                                    colorFilter = ColorFilter.tint(iconButtonColor),
+                                    modifier = Modifier
+                                        .align(Alignment.Center)
+                                        .size(24.dp)
+                                        .alpha(1f),
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.size(6.dp))
+
                         Box(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier
@@ -1135,12 +1182,14 @@ fun BottomSheetPlayer(
                                 .size(40.dp)
                                 .clip(RoundedCornerShape(24.dp))
                                 .background(textButtonColor)
+                                .tvFocusableHighlight(RoundedCornerShape(24.dp))
                                 .clickable {
                                     menuState.show {
                                         PlayerMenu(
                                             mediaMetadata = mediaMetadata,
                                             navController = navController,
                                             playerBottomSheetState = state,
+                                            onShowAudioOutput = { audioRoutingSheetState.expandSoft() },
                                             onShowDetailsDialog = {
                                                 mediaMetadata.id.let {
                                                     bottomSheetPageState.show {
@@ -1269,9 +1318,22 @@ fun BottomSheetPlayer(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     val maxW = maxWidth
-                    val playButtonHeight = maxW / 6f
-                    val playButtonWidth = playButtonHeight * 2.2f
-                    val sideButtonHeight = playButtonHeight * 0.8f
+                    val isTablet = LocalConfiguration.current.screenWidthDp >= 840
+                    val playButtonHeight = if (isTablet) {
+                        86.dp
+                    } else {
+                        (maxW / 6f).coerceIn(68.dp, 96.dp)
+                    }
+                    val playButtonWidth = if (isTablet) {
+                        210.dp
+                    } else {
+                        playButtonHeight * 2.2f
+                    }
+                    val sideButtonHeight = if (isTablet) {
+                        68.dp
+                    } else {
+                        playButtonHeight * 0.8f
+                    }
                     val sideButtonWidth = sideButtonHeight * 1.3f
 
                     val playInteractionSource = remember { MutableInteractionSource() }
@@ -1412,6 +1474,7 @@ fun BottomSheetPlayer(
                             .size(72.dp)
                             .clip(RoundedCornerShape(playPauseRoundness))
                             .background(textButtonColor)
+                            .tvFocusableHighlight(RoundedCornerShape(playPauseRoundness))
                             .clickable {
                                 if (playbackState == STATE_ENDED) {
                                     playerConnection.player.seekTo(0, 0)
@@ -1607,6 +1670,7 @@ fun BottomSheetPlayer(
             textButtonColor = textButtonColor,
             iconButtonColor = iconButtonColor,
             onShowLyrics = { showInlineLyrics = !showInlineLyrics },
+            onShowAudioOutput = { audioRoutingSheetState.expandSoft() },
             pureBlack = pureBlack,
         )
         
@@ -2144,6 +2208,18 @@ fun BottomSheetPlayer(
                         
                         // WiFi Audio devices - Google Cast integration
                         val coroutineScope = rememberCoroutineScope()
+                        val dlnaManager = remember(playerConnection.service) {
+                            runCatching { playerConnection.service.dlnaManager }.getOrNull()
+                        }
+                        val dlnaDevices = dlnaManager
+                            ?.devices
+                            ?.collectAsState(initial = emptyList())
+                            ?.value
+                            ?: emptyList()
+                        val selectedDlnaDevice = dlnaManager
+                            ?.selectedDevice
+                            ?.collectAsState(initial = null)
+                            ?.value
                         
                         // Check for required permissions before initializing Cast
                         val hasRequiredPermissions = remember {
@@ -2308,7 +2384,13 @@ fun BottomSheetPlayer(
                             it.connectionState != MediaRouter.RouteInfo.CONNECTION_STATE_CONNECTED
                         }
                         
-                        val hasConnectedDevice = connectedWifiRoutes.isNotEmpty() || castSession.value != null
+                        val hasConnectedDevice = connectedWifiRoutes.isNotEmpty() ||
+                            castSession.value != null ||
+                            selectedDlnaDevice != null
+
+                        val availableDlnaDevices = dlnaDevices.filter { device ->
+                            selectedDlnaDevice?.id != device.id
+                        }
                         
                         if (hasConnectedDevice) {
                             // Show connected Cast device first
@@ -2396,6 +2478,49 @@ fun BottomSheetPlayer(
                                     )
                                 }
                             }
+
+                            // Show connected DLNA device
+                            selectedDlnaDevice?.let { dlnaDevice ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f))
+                                        .clickable {
+                                            dlnaManager?.selectDevice(null)
+                                            Toast.makeText(context, "Disconnected from ${dlnaDevice.name}", Toast.LENGTH_SHORT).show()
+                                            audioRoutingSheetState.collapseSoft()
+                                        }
+                                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        painter = painterResource(R.drawable.audio_wifi),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(28.dp),
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(Modifier.width(16.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            dlnaDevice.name,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Medium,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                        Text(
+                                            "DLNA connected",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                    Text(
+                                        "Disconnect",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
                         } else if (isWifiOn) {
                             // WiFi is ON - show available devices
                             if (availableWifiRoutes.isNotEmpty()) {
@@ -2443,10 +2568,47 @@ fun BottomSheetPlayer(
                                     }
                                 }
                             }
+
+                            // Show available DLNA devices
+                            if (availableDlnaDevices.isNotEmpty()) {
+                                availableDlnaDevices.forEach { dlnaDevice ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .clickable {
+                                                dlnaManager?.selectDevice(dlnaDevice)
+                                                Toast.makeText(context, "Connecting to ${dlnaDevice.name}", Toast.LENGTH_SHORT).show()
+                                                audioRoutingSheetState.collapseSoft()
+                                            }
+                                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            painter = painterResource(R.drawable.audio_wifi),
+                                            contentDescription = null,
+                                            modifier = Modifier.size(28.dp),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Spacer(Modifier.width(16.dp))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                dlnaDevice.name,
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                            Text(
+                                                "DLNA ${dlnaDevice.modelName}",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                             
                             // Show scan button if no devices found (WiFi or Cast)
-                            if (availableWifiRoutes.isEmpty() && connectedWifiRoutes.isEmpty() && 
-                                castSession.value == null) {
+                            if (availableWifiRoutes.isEmpty() && availableDlnaDevices.isEmpty()) {
                                 // No WiFi/Cast devices found - show scanning status
                                 Column(
                                     modifier = Modifier
@@ -2488,11 +2650,17 @@ fun BottomSheetPlayer(
                                                 isScanning = true
                                                 try {
                                                     // Scan for both WiFi/Cast and DLNA devices
-                                                    mediaRouter?.let { router ->
-                                                        selector?.let { sel ->
-                                                            Toast.makeText(context, "Scanning for WiFi & Cast devices...", Toast.LENGTH_SHORT).show()
+                                                    if (mediaRouter != null && selector != null) {
+                                                        discoveredRoutes = mediaRouter.routes.filter { r ->
+                                                            (r.matchesSelector(selector) &&
+                                                                !r.isDefaultOrBluetooth &&
+                                                                r.isEnabled) ||
+                                                                r.description?.contains("Cast", ignoreCase = true) == true ||
+                                                                r.name.contains("Cast", ignoreCase = true)
                                                         }
                                                     }
+                                                    dlnaManager?.startDiscovery()
+                                                    Toast.makeText(context, "Scanning for WiFi, Cast & DLNA devices...", Toast.LENGTH_SHORT).show()
                                                     
                                                     // Auto-stop scanning after 5 seconds
                                                     coroutineScope.launch {
@@ -2579,9 +2747,9 @@ fun InlineLyricsView(
                         iad1tya.echo.music.di.LyricsHelperEntryPoint::class.java
                     )
                     val lyricsHelper = entryPoint.lyricsHelper()
-                    val fetchedLyrics = lyricsHelper.getLyrics(mediaMetadata)
+                    val fetchedLyrics = lyricsHelper.getLyricsWithProvider(mediaMetadata)
                     database.query {
-                        upsert(LyricsEntity(mediaMetadata.id, fetchedLyrics))
+                        upsert(LyricsEntity(mediaMetadata.id, fetchedLyrics.lyrics, fetchedLyrics.providerName))
                     }
                 } catch (_: Exception) {
                 }

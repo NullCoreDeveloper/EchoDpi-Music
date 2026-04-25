@@ -1,5 +1,6 @@
 package iad1tya.echo.music.ui.player
 
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -30,6 +31,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -74,10 +76,12 @@ import iad1tya.echo.music.LocalDatabase
 import iad1tya.echo.music.LocalPlayerConnection
 import iad1tya.echo.music.R
 import iad1tya.echo.music.constants.MiniPlayerHeight
+import iad1tya.echo.music.constants.FloatingCompactMaxWidth
+import iad1tya.echo.music.constants.FloatingCompactWidthFraction
+import iad1tya.echo.music.constants.OldNavbarStyleKey
 import iad1tya.echo.music.constants.PureBlackMiniPlayerKey
 import iad1tya.echo.music.constants.SwipeSensitivityKey
 import iad1tya.echo.music.constants.ThumbnailCornerRadius
-import iad1tya.echo.music.constants.UseNewMiniPlayerDesignKey
 import iad1tya.echo.music.db.entities.ArtistEntity
 import iad1tya.echo.music.extensions.togglePlayPause
 import iad1tya.echo.music.models.MediaMetadata
@@ -89,8 +93,13 @@ import kotlinx.coroutines.withContext
 import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.composed
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.palette.graphics.Palette
 import coil3.imageLoader
 import coil3.request.ImageRequest
@@ -99,6 +108,27 @@ import coil3.toBitmap
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.graphics.toArgb
 
+private fun Modifier.tvFocusableHighlight(shape: Shape): Modifier = composed {
+    val context = LocalContext.current
+    val isTvDevice = remember(context) {
+        context.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
+    }
+    var isFocused by remember { mutableStateOf(false) }
+
+    if (isTvDevice) {
+        this
+            .focusable()
+            .onFocusChanged { isFocused = it.isFocused }
+            .border(
+                width = if (isFocused) 2.dp else 0.dp,
+                color = if (isFocused) MaterialTheme.colorScheme.primary else Color.Transparent,
+                shape = shape
+            )
+    } else {
+        this
+    }
+}
+
 @Composable
 fun MiniPlayer(
     position: Long,
@@ -106,7 +136,7 @@ fun MiniPlayer(
     modifier: Modifier = Modifier,
     pureBlack: Boolean,
 ) {
-    val useNewMiniPlayerDesign by rememberPreference(UseNewMiniPlayerDesignKey, true)
+    val useNewMiniPlayerDesign = true
 
     if (useNewMiniPlayerDesign) {
         NewMiniPlayer(
@@ -160,6 +190,11 @@ private fun NewMiniPlayer(
     val swipeSensitivity by rememberPreference(SwipeSensitivityKey, 0.73f)
     val swipeThumbnail by rememberPreference(iad1tya.echo.music.constants.SwipeThumbnailKey, true)
     val pureBlackMiniPlayer by rememberPreference(PureBlackMiniPlayerKey, false)
+    val oldNavbarStyle by rememberPreference(OldNavbarStyleKey, false)
+
+    val miniPlayerWidthFraction = if (oldNavbarStyle) 0.96f else 0.82f
+    val miniPlayerHorizontalPadding = if (oldNavbarStyle) 6.dp else 12.dp
+    val miniPlayerMaxWidth = if (oldNavbarStyle) 560.dp else FloatingCompactMaxWidth
 
     val configuration = LocalConfiguration.current
     val isTabletLandscape = configuration.screenWidthDp >= 600 &&
@@ -231,7 +266,7 @@ private fun NewMiniPlayer(
             .fillMaxWidth()
             .height(MiniPlayerHeight)
             .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Horizontal))
-            .padding(horizontal = 12.dp)
+            .padding(horizontal = miniPlayerHorizontalPadding)
             // Move the swipe detection to the outer box to affect the entire box
             .let { baseModifier ->
                 if (swipeThumbnail) {
@@ -309,12 +344,15 @@ private fun NewMiniPlayer(
                             .width(500.dp)
                             .align(Alignment.CenterEnd) // Right align
                     } else {
-                        Modifier.fillMaxWidth()
+                        Modifier
+                            .fillMaxWidth(miniPlayerWidthFraction)
+                            .widthIn(max = miniPlayerMaxWidth)
+                            .align(Alignment.Center)
                     }
                 )
                 .height(64.dp) // Circular height
                 .offset { IntOffset(offsetXAnimatable.value.roundToInt(), 0) }
-                .clip(RoundedCornerShape(32.dp)) // Clip first for perfect rounded corners
+                .clip(RoundedCornerShape(28.dp)) // Match floating toolbar roundness
                 .then(
                     if (pureBlack || pureBlackMiniPlayer) {
                         Modifier.background(Color.Black)
@@ -451,6 +489,7 @@ private fun NewMiniPlayer(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
                         .size(40.dp)
+                        .tvFocusableHighlight(CircleShape)
                         .clip(CircleShape)
                         .border(
                             width = 1.dp,
@@ -486,6 +525,7 @@ private fun NewMiniPlayer(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
                         .size(40.dp)
+                        .tvFocusableHighlight(CircleShape)
                         .clip(CircleShape)
                         .border(
                             width = 1.dp,
@@ -534,6 +574,7 @@ private fun NewMiniPlayer(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
                         .size(40.dp)
+                        .tvFocusableHighlight(CircleShape)
                         .clip(CircleShape)
                         .border(
                             width = 1.dp,
@@ -642,7 +683,9 @@ private fun LegacyMiniPlayer(
                 if (isTabletLandscape) {
                     Modifier.width(500.dp)
                 } else {
-                    Modifier.fillMaxWidth()
+                    Modifier
+                        .fillMaxWidth(FloatingCompactWidthFraction)
+                        .widthIn(max = FloatingCompactMaxWidth)
                 }
             )
             .height(MiniPlayerHeight)
@@ -650,7 +693,7 @@ private fun LegacyMiniPlayer(
             // NEW: Clip the shape BEFORE applying the background.
             // This ensures that the background is applied to the clipped, rounded shape,
             // preventing sharp edges when the width is reduced.
-            .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+            .clip(RoundedCornerShape(28.dp))
             .then(
                 if (pureBlack || pureBlackMiniPlayer) {
                     Modifier.background(Color.Black)

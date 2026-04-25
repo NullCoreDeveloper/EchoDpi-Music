@@ -3,20 +3,17 @@ package iad1tya.echo.music.ui.player
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
+import android.app.Activity
+import android.content.Context.AUDIO_SERVICE
+import android.media.AudioManager
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.snapping.SnapLayoutInfoProvider
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
@@ -38,7 +35,6 @@ import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -59,14 +55,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Outline
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -97,10 +88,13 @@ import iad1tya.echo.music.constants.SwipeThumbnailKey
 import iad1tya.echo.music.constants.TapAlbumArtForLyricsKey
 import iad1tya.echo.music.constants.ThumbnailCornerRadius
 import iad1tya.echo.music.constants.ThumbnailCornerRadiusKey
-import iad1tya.echo.music.constants.CanvasThumbnailAnimationKey
 import iad1tya.echo.music.constants.CropAlbumArtKey
+import iad1tya.echo.music.constants.ArchiveTuneCanvasKey
 import iad1tya.echo.music.constants.HidePlayerThumbnailKey
+import iad1tya.echo.music.constants.MaxCanvasCacheSizeKey
 import iad1tya.echo.music.constants.DoubleTapToLikeKey
+import iad1tya.echo.music.constants.GestureDoubleTapSeekKey
+import iad1tya.echo.music.constants.GestureVerticalControlsKey
 import iad1tya.echo.music.utils.rememberEnumPreference
 import iad1tya.echo.music.utils.rememberPreference
 import kotlinx.coroutines.Dispatchers
@@ -108,8 +102,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
-import kotlin.math.cos
-import kotlin.math.sin
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -123,6 +115,7 @@ fun Thumbnail(
     val context = LocalContext.current
     val currentView = LocalView.current
     val coroutineScope = rememberCoroutineScope()
+    val audioManager = remember(context) { context.getSystemService(AUDIO_SERVICE) as? AudioManager }
 
     // States
     val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
@@ -132,10 +125,16 @@ fun Thumbnail(
     val swipeThumbnail by rememberPreference(SwipeThumbnailKey, true)
     val tapAlbumArtForLyrics by rememberPreference(TapAlbumArtForLyricsKey, false)
     val doubleTapToLike by rememberPreference(DoubleTapToLikeKey, false)
+    val doubleTapSeekEnabled by rememberPreference(GestureDoubleTapSeekKey, true)
+    val verticalGesturesEnabled by rememberPreference(GestureVerticalControlsKey, false)
     val thumbnailCornerRadius by rememberPreference(ThumbnailCornerRadiusKey, 3f)
     val cropAlbumArt by rememberPreference(CropAlbumArtKey, false)
     val hidePlayerThumbnail by rememberPreference(HidePlayerThumbnailKey, false)
-    val canvasThumbnailAnimation by rememberPreference(CanvasThumbnailAnimationKey, false)
+    val canvasThumbnailAnimation by rememberPreference(ArchiveTuneCanvasKey, false)
+    val (maxCanvasCacheSize, _) = rememberPreference(
+        key = MaxCanvasCacheSizeKey,
+        defaultValue = 256,
+    )
     val canSkipPrevious by playerConnection.canSkipPrevious.collectAsState()
     val canSkipNext by playerConnection.canSkipNext.collectAsState()
     
@@ -150,6 +149,10 @@ fun Thumbnail(
         PlayerBackgroundStyle.GRADIENT -> Color.White
         PlayerBackgroundStyle.BLUR -> Color.White
         PlayerBackgroundStyle.GLOW_ANIMATED -> Color.White
+    }
+
+    LaunchedEffect(maxCanvasCacheSize) {
+        iad1tya.echo.music.canvas.CanvasArtworkPlaybackCache.setMaxSize(maxCanvasCacheSize)
     }
     
     // Grid state
@@ -317,6 +320,9 @@ fun Thumbnail(
                             var lastTapTime by remember { mutableLongStateOf(0L) }
 
             val isCurrentItem = item.mediaId == (currentMediaItem?.mediaId ?: "")
+            val shouldAnimateCanvas =
+                canvasThumbnailAnimation &&
+                    isCurrentItem
             var canvasArtwork by remember(item.mediaId) { mutableStateOf<iad1tya.echo.music.canvas.CanvasArtwork?>(null) }
             val canvasFetchInFlight = remember(item.mediaId) { mutableStateOf(false) }
             val storefront = remember {
@@ -324,20 +330,15 @@ fun Thumbnail(
                 if (country.length == 2) country.lowercase(java.util.Locale.ROOT) else "us"
             }
 
-            // Hexagon border rotation — always composed, only visually active when canvasThumbnailAnimation is true
-            val hexTransition = rememberInfiniteTransition(label = "hexAnimation")
-            val hexAnimRotation by hexTransition.animateFloat(
-                initialValue = 0f,
-                targetValue = 360f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(durationMillis = 8000, easing = LinearEasing),
-                    repeatMode = RepeatMode.Restart
-                ),
-                label = "hexRotation"
-            )
+            LaunchedEffect(shouldAnimateCanvas) {
+                if (!shouldAnimateCanvas) {
+                    canvasArtwork = null
+                    canvasFetchInFlight.value = false
+                }
+            }
 
-            if (canvasThumbnailAnimation && isCurrentItem) {
-                LaunchedEffect(item.mediaId) {
+            if (shouldAnimateCanvas) {
+                LaunchedEffect(item.mediaId, item.mediaMetadata.title, item.mediaMetadata.artist, item.mediaMetadata.subtitle) {
                     iad1tya.echo.music.canvas.CanvasArtworkPlaybackCache.get(item.mediaId)?.let { cached ->
                         canvasArtwork = cached
                         return@LaunchedEffect
@@ -346,10 +347,10 @@ fun Thumbnail(
                     canvasFetchInFlight.value = true
                     val fetched = withContext(Dispatchers.IO) {
                         val songTitleRaw = item.mediaMetadata.title?.toString() ?: ""
-                        val artistNameRaw = item.mediaMetadata.artist?.toString() ?: ""
-                        val albumName = item.mediaMetadata.albumTitle?.toString()
-                        val durationMs = item.mediaMetadata.durationMs
-                        val durationSec = if (durationMs != null && durationMs > 0) (durationMs / 1000).toInt() else null
+                        val artistNameRaw =
+                            item.mediaMetadata.artist?.toString()
+                                ?.takeIf { it.isNotBlank() }
+                                ?: item.mediaMetadata.subtitle?.toString().orEmpty()
                         val songTitle = normalizeCanvasSongTitle(songTitleRaw)
                         val artistName = normalizeCanvasArtistName(artistNameRaw)
                         linkedSetOf(
@@ -362,8 +363,6 @@ fun Thumbnail(
                                 iad1tya.echo.music.canvas.ArchiveTuneCanvas.getBySongArtist(
                                     song = s,
                                     artist = a,
-                                    album = albumName,
-                                    duration = durationSec,
                                     storefront = storefront
                                 )?.takeIf { !it.preferredAnimationUrl.isNullOrBlank() }
                             }
@@ -380,7 +379,7 @@ fun Thumbnail(
                                     .width(horizontalLazyGridItemWidth)
                                     .fillMaxSize()
                                     .padding(horizontal = PlayerHorizontalPadding)
-                                    .pointerInput(Unit) {
+                                    .pointerInput(doubleTapToLike, doubleTapSeekEnabled, tapAlbumArtForLyrics) {
                                         detectTapGestures(
                                             onTap = {
                                                 if (tapAlbumArtForLyrics) {
@@ -392,6 +391,7 @@ fun Thumbnail(
                                                     playerConnection.toggleLike()
                                                     return@detectTapGestures
                                                 }
+                                                if (!doubleTapSeekEnabled) return@detectTapGestures
 
                                                 val currentPosition = playerConnection.player.currentPosition
                                                 val duration = playerConnection.player.duration
@@ -424,6 +424,33 @@ fun Thumbnail(
                                                 showSeekEffect = true
                                             }
                                         )
+                                    }
+                                    .pointerInput(verticalGesturesEnabled) {
+                                        if (!verticalGesturesEnabled) return@pointerInput
+                                        detectVerticalDragGestures { change, dragAmount ->
+                                            change.consume()
+                                            val isLeftSide = change.position.x < size.width / 2f
+                                            if (isLeftSide) {
+                                                val activity = context as? Activity
+                                                val window = activity?.window ?: return@detectVerticalDragGestures
+                                                val currentBrightness = if (window.attributes.screenBrightness >= 0f) {
+                                                    window.attributes.screenBrightness
+                                                } else {
+                                                    0.5f
+                                                }
+                                                val updated = (currentBrightness - dragAmount / 1400f).coerceIn(0.05f, 1f)
+                                                window.attributes = window.attributes.apply {
+                                                    screenBrightness = updated
+                                                }
+                                            } else {
+                                                val manager = audioManager ?: return@detectVerticalDragGestures
+                                                val maxVolume = manager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                                                val currentVolume = manager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                                                val delta = (-dragAmount / 80f).toInt()
+                                                val target = (currentVolume + delta).coerceIn(0, maxVolume)
+                                                manager.setStreamVolume(AudioManager.STREAM_MUSIC, target, 0)
+                                            }
+                                        }
                                     },
                                 contentAlignment = Alignment.Center
                             ) {
@@ -438,16 +465,9 @@ fun Thumbnail(
                                     Box(
                                         modifier = Modifier
                                             .fillMaxSize()
-                                            .then(
-                                                if (canvasThumbnailAnimation)
-                                                    Modifier.graphicsLayer {
-                                                        clip = true
-                                                        shape = ScallopShape(rotationDeg = hexAnimRotation)
-                                                    }
-                                                else Modifier.clip(RoundedCornerShape(thumbnailCornerRadius.dp))
-                                            )
+                                            .clip(RoundedCornerShape(thumbnailCornerRadius.dp))
                                     ) {
-                                        // Content — image stays upright naturally (graphicsLayer clip only rotates the shape boundary)
+                                        // Content
                                         Box(
                                             modifier = Modifier.fillMaxSize()
                                         ) {
@@ -463,7 +483,7 @@ fun Thumbnail(
                                                 error = painterResource(R.drawable.echo_logo),
                                                 modifier = Modifier.fillMaxSize()
                                             )
-                                            if (canvasThumbnailAnimation && isCurrentItem) {
+                                            if (shouldAnimateCanvas) {
                                                 canvasArtwork?.let { artwork ->
                                                     val isPlayingCanvas by playerConnection.isPlaying.collectAsState()
                                                     CanvasArtworkPlayer(
@@ -597,38 +617,6 @@ private fun normalizeCanvasSongTitle(raw: String): String {
         .replace(Regex("\\s+"), " ")
         .trim()
     return stripped.trim('-').replace(Regex("\\s+"), " ").trim()
-}
-
-/**
- * Scalloped "cookie badge" shape for clipping images.
- * [rotationDeg] rotates the whole shape. Keep 0f for a static clip.
- */
-private class ScallopShape(
-    private val rotationDeg: Float = 0f,
-    private val numBumps: Int = 12,
-    private val bumpFraction: Float = 0.10f,
-    private val baseFraction: Float = 0.88f,
-) : Shape {
-    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
-        val cx = size.width / 2f
-        val cy = size.height / 2f
-        val minR = minOf(cx, cy)
-        val baseR = minR * baseFraction
-        val bumpAmp = minR * bumpFraction
-        val steps = 720
-        val path = Path()
-        for (i in 0..steps) {
-            val angleDeg = i.toDouble() * 360.0 / steps
-            val bumpRad = Math.toRadians(angleDeg * numBumps)
-            val r = baseR + bumpAmp * cos(bumpRad).toFloat()
-            val rotRad = Math.toRadians(angleDeg + rotationDeg)
-            val x = cx + r * cos(rotRad).toFloat()
-            val y = cy + r * sin(rotRad).toFloat()
-            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
-        }
-        path.close()
-        return Outline.Generic(path)
-    }
 }
 
 private fun normalizeCanvasArtistName(raw: String): String {
