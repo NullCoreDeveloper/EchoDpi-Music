@@ -122,11 +122,7 @@ constructor(
                 return@Factory if (cachedUrl != null) dataSpec.withUri(cachedUrl.first.toUri()) else dataSpec
             }
 
-<<<<<<< HEAD
             cachedUrl?.let {
-=======
-            songUrlCache[mediaId]?.takeIf { it.second > System.currentTimeMillis() }?.let {
->>>>>>> upstream/main
                 return@Factory dataSpec.withUri(it.first.toUri())
             }
 
@@ -189,12 +185,7 @@ constructor(
                 "${it}&range=0-${format.contentLength ?: 10000000}"
             }
 
-<<<<<<< HEAD
             songUrlCache[mediaId] = streamUrl to (System.currentTimeMillis() + playbackData.streamExpiresInSeconds * 1000L)
-=======
-            songUrlCache[mediaId] =
-                streamUrl to (System.currentTimeMillis() + playbackData.streamExpiresInSeconds * 1000L)
->>>>>>> upstream/main
             dataSpec.withUri(streamUrl.toUri())
         }
 

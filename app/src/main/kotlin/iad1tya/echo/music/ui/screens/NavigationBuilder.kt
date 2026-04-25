@@ -164,7 +164,6 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.topLevelTabPopExit
         else -> fadeOut(tween(TOP_LEVEL_TAB_FADE_OUT_DURATION, easing = FastOutSlowInEasing))
     }
 
->>>>>>> upstream/main
 
 @OptIn(ExperimentalMaterial3Api::class)
 fun NavGraphBuilder.navigationBuilder(
