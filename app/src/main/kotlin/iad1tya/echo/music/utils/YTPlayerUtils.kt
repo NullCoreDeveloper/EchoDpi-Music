@@ -197,27 +197,27 @@ object YTPlayerUtils {
                 }
             }
 
-            if (mainPlayerResponse == null) mainPlayerResponse = mainPlayerResponseResult.getOrThrow()
-
             val poToken: PoTokenResult? = poTokenDeferred.await()
-            val mainStatus = mainPlayerResponse.playabilityStatus.status
+            var response = mainPlayerResponse ?: mainPlayerResponseResult.getOrThrow()
+
+            val mainStatus = response.playabilityStatus.status
             val isAgeRestricted = mainStatus in listOf("AGE_CHECK_REQUIRED", "AGE_VERIFICATION_REQUIRED", "LOGIN_REQUIRED", "CONTENT_CHECK_REQUIRED")
 
             if (isAgeRestricted && isLoggedIn) {
                 YouTube.player(videoId, apiPlaylistId, WEB_CREATOR, null).getOrNull()?.let {
-                    if (it.playabilityStatus.status == "OK") mainPlayerResponse = it
+                    if (it.playabilityStatus.status == "OK") response = it
                 }
             }
 
-            val audioConfig = mainPlayerResponse.playerConfig?.audioConfig
-            val videoDetails = mainPlayerResponse.videoDetails
-            val playbackTracking = mainPlayerResponse.playbackTracking
+            val audioConfig = response.playerConfig?.audioConfig
+            val videoDetails = response.videoDetails
+            val playbackTracking = response.playbackTracking
             var format: PlayerResponse.StreamingData.Format? = null
             var streamUrl: String? = null
             var streamExpiresInSeconds: Int? = null
             var streamPlayerResponse: PlayerResponse? = null
 
-            val isPrivateTrack = mainPlayerResponse.videoDetails?.musicVideoType == "MUSIC_VIDEO_TYPE_PRIVATELY_OWNED_TRACK" || isUploadedTrack
+            val isPrivateTrack = response.videoDetails?.musicVideoType == "MUSIC_VIDEO_TYPE_PRIVATELY_OWNED_TRACK" || isUploadedTrack
             val streamClients = buildList {
                 add(preferredClient)
                 add(MAIN_CLIENT)
@@ -230,7 +230,7 @@ object YTPlayerUtils {
                 streamExpiresInSeconds = null
 
                 if (client.clientName == MAIN_CLIENT.clientName) {
-                    streamPlayerResponse = mainPlayerResponse
+                    streamPlayerResponse = response
                 } else {
                     if (client.loginRequired && !isLoggedIn) continue
                     val clientSigTimestamp = if (isAgeRestricted) null else signatureTimestamp
