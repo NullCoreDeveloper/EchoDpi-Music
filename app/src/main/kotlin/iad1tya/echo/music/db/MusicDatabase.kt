@@ -577,9 +577,28 @@ val MIGRATION_27_28 =
             if (!columns.contains("isDownloaded")) {
                 db.execSQL("ALTER TABLE song ADD COLUMN isDownloaded INTEGER NOT NULL DEFAULT 0")
             }
+            if (!columns.contains("playbackSource")) {
+                db.execSQL("ALTER TABLE song ADD COLUMN playbackSource INTEGER NOT NULL DEFAULT 0")
+            }
             if (!columns.contains("isUploaded")) {
                 db.execSQL("ALTER TABLE song ADD COLUMN isUploaded INTEGER NOT NULL DEFAULT 0")
             }
+
+            // Check if lyrics table requires 'provider' column from upstream's version 27
+            val lyricsCursor = db.query("PRAGMA table_info(lyrics)")
+            val lyricsColumns = mutableSetOf<String>()
+            while (lyricsCursor.moveToNext()) {
+                val index = lyricsCursor.getColumnIndex("name")
+                if (index != -1) {
+                    lyricsColumns.add(lyricsCursor.getString(index))
+                }
+            }
+            lyricsCursor.close()
+
+            if (!lyricsColumns.contains("provider")) {
+                db.execSQL("ALTER TABLE lyrics ADD COLUMN provider TEXT NOT NULL DEFAULT 'Unknown'")
+            }
+
             // New account table for multi-account support
             db.execSQL("""
                 CREATE TABLE IF NOT EXISTS `account` (
