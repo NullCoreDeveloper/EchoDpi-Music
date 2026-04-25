@@ -15,7 +15,7 @@ ksp = "2.2.10-2.0.2"
 jsoup = "1.21.2"
 multidex = "2.0.1"
 coil = "3.4.0"
-ucrop = "2.2.9"
+ucrop = "2.2.11"
 wire = "5.4.0"
 guava = "33.5.0-android"
 coroutinesGuava = "1.10.2"
@@ -83,7 +83,7 @@ appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat"
 
 coil = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
 coil-network-okhttp = { module = "io.coil-kt.coil3:coil-network-okhttp", version.ref = "coil" }
-ucrop = { module = "com.yalantis:ucrop", version.ref = "ucrop" }
+ucrop = { module = "com.github.yalantis:ucrop", version.ref = "ucrop" }
 wire-runtime = { module = "com.squareup.wire:wire-runtime", version.ref = "wire" }
 
 shimmer = { module = "com.valentinilk.shimmer:compose-shimmer", version.ref = "shimmer" }
