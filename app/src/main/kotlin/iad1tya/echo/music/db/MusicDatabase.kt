@@ -555,12 +555,31 @@ val MIGRATION_26_27 =
 val MIGRATION_27_28 =
     object : Migration(27, 28) {
         override fun migrate(db: SupportSQLiteDatabase) {
-            // New song columns added in upstream v4.2.2
-            db.execSQL("ALTER TABLE song ADD COLUMN libraryAddToken TEXT DEFAULT NULL")
-            db.execSQL("ALTER TABLE song ADD COLUMN libraryRemoveToken TEXT DEFAULT NULL")
-            db.execSQL("ALTER TABLE song ADD COLUMN romanizeLyrics INTEGER NOT NULL DEFAULT 1")
-            db.execSQL("ALTER TABLE song ADD COLUMN isDownloaded INTEGER NOT NULL DEFAULT 0")
-            db.execSQL("ALTER TABLE song ADD COLUMN isUploaded INTEGER NOT NULL DEFAULT 0")
+            val cursor = db.query("PRAGMA table_info(song)")
+            val columns = mutableSetOf<String>()
+            while (cursor.moveToNext()) {
+                val index = cursor.getColumnIndex("name")
+                if (index != -1) {
+                    columns.add(cursor.getString(index))
+                }
+            }
+            cursor.close()
+
+            if (!columns.contains("libraryAddToken")) {
+                db.execSQL("ALTER TABLE song ADD COLUMN libraryAddToken TEXT DEFAULT NULL")
+            }
+            if (!columns.contains("libraryRemoveToken")) {
+                db.execSQL("ALTER TABLE song ADD COLUMN libraryRemoveToken TEXT DEFAULT NULL")
+            }
+            if (!columns.contains("romanizeLyrics")) {
+                db.execSQL("ALTER TABLE song ADD COLUMN romanizeLyrics INTEGER NOT NULL DEFAULT 1")
+            }
+            if (!columns.contains("isDownloaded")) {
+                db.execSQL("ALTER TABLE song ADD COLUMN isDownloaded INTEGER NOT NULL DEFAULT 0")
+            }
+            if (!columns.contains("isUploaded")) {
+                db.execSQL("ALTER TABLE song ADD COLUMN isUploaded INTEGER NOT NULL DEFAULT 0")
+            }
             // New account table for multi-account support
             db.execSQL("""
                 CREATE TABLE IF NOT EXISTS `account` (
