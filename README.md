@@ -8,7 +8,7 @@
 
 ---
 
-## 🎵 О проекте
+## 🎵 О проекте ![visitors](https://visitor-badge.laobi.icu/badge?page_id=kiktor12358.EchoDpi-Music)
 
 **EchoDpi Music** — это модификация популярного open-source плеера Echo Music, созданная специально для бесперебойного доступа к музыке в условиях блокировок и глубокого анализа трафика (DPI/ТСПУ).
 
