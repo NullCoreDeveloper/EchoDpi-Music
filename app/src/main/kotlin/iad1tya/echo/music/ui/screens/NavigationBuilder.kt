@@ -485,7 +485,6 @@ fun NavGraphBuilder.navigationBuilder(
     composable("settings/network_troubleshoot") {
         NetworkTroubleshootSettings(navController, scrollBehavior)
     }
-    }
     composable("settings/backup_restore") {
         BackupAndRestore(navController, scrollBehavior)
     }
