@@ -217,6 +217,13 @@ object YTPlayerUtils {
             var streamExpiresInSeconds: Int? = null
             var streamPlayerResponse: PlayerResponse? = null
 
+            // Tracks the last successfully resolved stream (even if not validated).
+            // Used as fallback when the last client(s) are skipped (loginRequired) or fail.
+            var bestValidFormat: PlayerResponse.StreamingData.Format? = null
+            var bestValidStreamUrl: String? = null
+            var bestValidExpiry: Int? = null
+            var bestValidStreamResponse: PlayerResponse? = null
+
             val isPrivateTrack = response.videoDetails?.musicVideoType == "MUSIC_VIDEO_TYPE_PRIVATELY_OWNED_TRACK" || isUploadedTrack
             val streamClients = buildList {
                 add(preferredClient)
@@ -261,10 +268,25 @@ object YTPlayerUtils {
                     streamExpiresInSeconds = streamPlayerResponse?.streamingData?.expiresInSeconds
                     if (streamExpiresInSeconds == null) continue
 
+                    // Persist as best-found fallback (in case later clients all fail/skip)
+                    bestValidFormat = format
+                    bestValidStreamUrl = streamUrl
+                    bestValidExpiry = streamExpiresInSeconds
+                    bestValidStreamResponse = streamPlayerResponse
+
                     val isPrivatelyOwned = streamPlayerResponse?.videoDetails?.musicVideoType == "MUSIC_VIDEO_TYPE_PRIVATELY_OWNED_TRACK" || isUploadedTrack || isPrivateTrack
                     if (clientIndex == streamClients.size - 1 || isPrivatelyOwned) break
                     if (validateStatus(streamUrl!!)) break
                 }
+            }
+
+            // If the loop finished without a break (e.g., all remaining clients loginRequired),
+            // fall back to the last valid stream we found during the search.
+            if (format == null && bestValidFormat != null) {
+                format = bestValidFormat
+                streamUrl = bestValidStreamUrl
+                streamExpiresInSeconds = bestValidExpiry
+                streamPlayerResponse = bestValidStreamResponse
             }
 
             if (streamPlayerResponse == null || streamPlayerResponse.playabilityStatus.status != "OK") {
